@@ -18,6 +18,8 @@ def render(tft, x, y, w, h, buf):
 
 def main():
     tft = tft_config.config()
+    tft.reset()
+    tft.init()
     width = tft.width()
     height = tft.height()
     buf = bytearray(width * 10 * 2)
