@@ -1,13 +1,6 @@
 import tft_config
 import framebuf
 import time
-try:
-    from tft_config import color565
-except:
-    def color565(r, g, b):
-        c = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3)
-        return c
-
 
 def hsv2rgb(hue, sat, val):
     '''The conversion algorithm comes from https://blog.csdn.net/lly_3485390095/article/details/104570885'''
@@ -56,6 +49,9 @@ new driver is way too fast at drawing.
 
 def main():
     tft = tft_config.config()
+    tft.reset()
+    tft.init()
+    tft.rotation(1)
     x = tft.width()
     y = tft.height()
     speed = 1
@@ -67,7 +63,7 @@ def main():
     count = 0
     while True:
         r, g, b = next(color)
-        fbuf.fill(color565(r, g, b))
+        fbuf.fill(tft.colorRGB(r, g, b))
         for j in range(0, y, speed):
             tft.bitmap(0, j, x, j + speed, buf)
             time.sleep(delay)
