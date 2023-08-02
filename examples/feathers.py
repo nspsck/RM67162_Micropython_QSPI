@@ -35,14 +35,16 @@ def main():
     The big show!
     '''
     tft = tft_config.config()
+    tft.reset()
+    tft.init()
     tft.rotation(1)
     buf = bytearray(1 * tft.height() * 2)
     fbuf = framebuf.FrameBuffer(buf, 1, tft.height(), framebuf.RGB565)
     height = tft.height()       # height of display in pixels
     width = tft.width()         # width if display in pixels
 
-    tfa = tft_config.TFA    # top free area when scrolling
-    bfa = tft_config.BFA    # bottom free area when scrolling
+    tfa = 0    # top free area when scrolling
+    bfa = 0   # bottom free area when scrolling
 
     scroll = 0                  # scroll position
     wheel = 0                   # color wheel position
