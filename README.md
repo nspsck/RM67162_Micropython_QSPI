@@ -18,6 +18,8 @@ This driver is based on [esp_lcd](https://docs.espressif.com/projects/esp-idf/en
 Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness, line, text` ect.
 For full details please visit [the documentation](#documentation).
 
+All fonts are created by russhughes.
+
 The firmware is provided each time when I update this repo. 
 
 To-DO:
