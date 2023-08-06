@@ -600,6 +600,73 @@ STATIC mp_obj_t rm67162_RM67162_fill_circle(size_t n_args, const mp_obj_t *args_
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_circle_obj, 5, 5, rm67162_RM67162_fill_circle);
 
 
+STATIC void line(rm67162_RM67162_obj_t *self, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t color) {
+    bool steep = ABS(y1 - y0) > ABS(x1 - x0);
+    if (steep) {
+        _swap_int16_t(x0, y0);
+        _swap_int16_t(x1, y1);
+    }
+
+    if (x0 > x1) {
+        _swap_int16_t(x0, x1);
+        _swap_int16_t(y0, y1);
+    }
+
+    int16_t dx = x1 - x0, dy = ABS(y1 - y0);
+    int16_t err = dx >> 1, ystep = -1, xs = x0, dlen = 0;
+
+    if (y0 < y1) {
+        ystep = 1;
+    }
+
+    // Split into steep and not steep for FastH/V separation
+    if (steep) {
+        for (; x0 <= x1; x0++) {
+            dlen++;
+            err -= dy;
+            if (err < 0) {
+                err += dx;
+                fast_vline(self, y0, xs, dlen, color);
+                dlen = 0;
+                y0 += ystep;
+                xs = x0 + 1;
+            }
+        }
+        if (dlen) {
+            fast_vline(self, y0, xs, dlen, color);
+        }
+    } else {
+        for (; x0 <= x1; x0++) {
+            dlen++;
+            err -= dy;
+            if (err < 0) {
+                err += dx;
+                fast_hline(self, xs, y0, dlen, color);
+                dlen = 0;
+                y0 += ystep;
+                xs = x0 + 1;
+            }
+        }
+        if (dlen) {
+            fast_hline(self, xs, y0, dlen, color);
+        }
+    }
+}
+
+
+STATIC mp_obj_t rm67162_RM67162_line(size_t n_args, const mp_obj_t *args_in) {
+    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args_in[0]);
+    uint16_t x0 = mp_obj_get_int(args_in[1]);
+    uint16_t y0 = mp_obj_get_int(args_in[2]);
+    uint16_t x1 = mp_obj_get_int(args_in[3]);
+    uint16_t y1 = mp_obj_get_int(args_in[4]);
+    uint16_t color = mp_obj_get_int(args_in[5]);
+
+    line(self, x0, y0, x1, y1, color);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_line_obj, 6, 6, rm67162_RM67162_line);
+
 
 STATIC mp_obj_t rm67162_RM67162_bitmap(size_t n_args, const mp_obj_t *args_in) {
     rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args_in[0]);
@@ -616,7 +683,8 @@ STATIC mp_obj_t rm67162_RM67162_bitmap(size_t n_args, const mp_obj_t *args_in) {
 
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(args_in[5], &bufinfo, MP_BUFFER_READ);
-    write_spi(self, LCD_CMD_CASET, (uint8_t[]) {
+    set_area(self, x_start, y_start, x_end, y_end);
+    /* write_spi(self, LCD_CMD_CASET, (uint8_t[]) {
         ((x_start >> 8) & 0x03),
         (x_start & 0xFF),
         (((x_end - 1) >> 8) & 0x03),
@@ -627,13 +695,110 @@ STATIC mp_obj_t rm67162_RM67162_bitmap(size_t n_args, const mp_obj_t *args_in) {
         (y_start & 0xFF),
         (((y_end - 1) >> 8) & 0x03),
         ((y_end - 1) & 0xFF),
-    }, 4);
+    }, 4); */
     size_t len = ((x_end - x_start) * (y_end - y_start) * self->fb_bpp / 8);
-    self->lcd_panel_p->tx_color(self->bus_obj, LCD_CMD_RAMWR, bufinfo.buf, len);
+    // self->lcd_panel_p->tx_color(self->bus_obj, LCD_CMD_RAMWR, bufinfo.buf, len);
+    write_color(self, bufinfo.buf, len);
 
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_bitmap_obj, 6, 6, rm67162_RM67162_bitmap);
+
+
+STATIC mp_obj_t rm67162_RM67162_text(size_t n_args, const mp_obj_t *args) {
+    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    uint8_t single_char_s;
+    const uint8_t *source = NULL;
+    size_t source_len = 0;
+
+    // extract arguments
+    mp_obj_module_t *font = MP_OBJ_TO_PTR(args[1]);
+
+    if (mp_obj_is_int(args[2])) {
+        mp_int_t c = mp_obj_get_int(args[2]);
+        single_char_s = (c & 0xff);
+        source = &single_char_s;
+        source_len = 1;
+    } else if (mp_obj_is_str(args[2])) {
+        source = (uint8_t *) mp_obj_str_get_str(args[2]);
+        source_len = strlen((char *)source);
+    } else if (mp_obj_is_type(args[2], &mp_type_bytes)) {
+        mp_obj_t text_data_buff = args[2];
+        mp_buffer_info_t text_bufinfo;
+        mp_get_buffer_raise(text_data_buff, &text_bufinfo, MP_BUFFER_READ);
+        source = text_bufinfo.buf;
+        source_len = text_bufinfo.len;
+    } else {
+        mp_raise_TypeError(MP_ERROR_TEXT("text requires either int, str or bytes."));
+        return mp_const_none;
+    }
+
+    mp_int_t x0 = mp_obj_get_int(args[3]);
+    mp_int_t y0 = mp_obj_get_int(args[4]);
+
+    mp_obj_dict_t *dict = MP_OBJ_TO_PTR(font->globals);
+    const uint8_t width = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTH)));
+    const uint8_t height = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_HEIGHT)));
+    const uint8_t first = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_FIRST)));
+    const uint8_t last = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_LAST)));
+
+    mp_obj_t font_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_FONT));
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(font_data_buff, &bufinfo, MP_BUFFER_READ);
+    const uint8_t *font_data = bufinfo.buf;
+
+    uint16_t fg_color;
+    uint16_t bg_color;
+
+    if (n_args > 5) {
+        fg_color = mp_obj_get_int(args[5]);
+    } else {
+        fg_color = WHITE;
+    }
+
+    if (n_args > 6) {
+        bg_color = mp_obj_get_int(args[6]);
+    } else {
+        bg_color = BLACK;
+    }
+
+    uint8_t wide = width / 8;
+    size_t buf_size = width * height * 2;
+
+    uint8_t chr;
+    if (self->frame_buffer) {
+    while (source_len--) {
+        chr = *source++;
+            if (chr >= first && chr <= last) {
+                uint16_t buf_idx = 0;
+                uint16_t chr_idx = (chr - first) * (height * wide);
+                for (uint8_t line = 0; line < height; line++) {
+                    for (uint8_t line_byte = 0; line_byte < wide; line_byte++) {
+                        uint8_t chr_data = font_data[chr_idx];
+                        for (uint8_t bit = 8; bit; bit--) {
+                            if (chr_data >> (bit - 1) & 1) {
+                                self->frame_buffer[buf_idx] = fg_color;
+                            } else {
+                                self->frame_buffer[buf_idx] = bg_color;
+                            }
+                            buf_idx++;
+                        }
+                        chr_idx++;
+                    }
+                }
+                uint16_t x1 = x0 + width - 1;
+                if (x1 < self->width) {
+                    set_area(self, x0, y0, x1, y0 + height - 1);
+                    write_color(self, (uint8_t *)self->frame_buffer, buf_size);
+                }
+                x0 += width;
+            }
+        }
+    }
+    return mp_const_none;
+}
+
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_text_obj, 5, 7, rm67162_RM67162_text);
 
 
 /*---------------------------------------------------------------------------------------------------
@@ -883,6 +1048,11 @@ STATIC mp_obj_t rm67162_RM67162_vscroll_start(size_t n_args, const mp_obj_t *arg
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_vscroll_start_obj, 2, 3, rm67162_RM67162_vscroll_start);
 
 
+/*
+Mapping to Micropython
+*/
+
+
 STATIC const mp_rom_map_elem_t rm67162_RM67162_locals_dict_table[] = {
     /* { MP_ROM_QSTR(MP_QSTR_custom_init),   MP_ROM_PTR(&rm67162_RM67162_custom_init_obj)   }, */
     { MP_ROM_QSTR(MP_QSTR_deinit),        MP_ROM_PTR(&rm67162_RM67162_deinit_obj)        },
@@ -895,10 +1065,12 @@ STATIC const mp_rom_map_elem_t rm67162_RM67162_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_fill),          MP_ROM_PTR(&rm67162_RM67162_fill_obj)          },
     { MP_ROM_QSTR(MP_QSTR_fill_rect),     MP_ROM_PTR(&rm67162_RM67162_fill_rect_obj)     },
     { MP_ROM_QSTR(MP_QSTR_fill_circle),   MP_ROM_PTR(&rm67162_RM67162_fill_circle_obj)   },
+    { MP_ROM_QSTR(MP_QSTR_line),          MP_ROM_PTR(&rm67162_RM67162_line_obj)          },
     { MP_ROM_QSTR(MP_QSTR_rect),          MP_ROM_PTR(&rm67162_RM67162_rect_obj)          },
     { MP_ROM_QSTR(MP_QSTR_circle),        MP_ROM_PTR(&rm67162_RM67162_circle_obj)        },
     { MP_ROM_QSTR(MP_QSTR_colorRGB),      MP_ROM_PTR(&rm67162_RM67162_colorRGB_obj)      },
     { MP_ROM_QSTR(MP_QSTR_bitmap),        MP_ROM_PTR(&rm67162_RM67162_bitmap_obj)        },
+    { MP_ROM_QSTR(MP_QSTR_text),          MP_ROM_PTR(&rm67162_RM67162_text_obj)          },
     { MP_ROM_QSTR(MP_QSTR_mirror),        MP_ROM_PTR(&rm67162_RM67162_mirror_obj)        },
     { MP_ROM_QSTR(MP_QSTR_swap_xy),       MP_ROM_PTR(&rm67162_RM67162_swap_xy_obj)       },
     { MP_ROM_QSTR(MP_QSTR_set_gap),       MP_ROM_PTR(&rm67162_RM67162_set_gap_obj)       },
@@ -938,4 +1110,37 @@ const mp_obj_type_t rm67162_RM67162_type = {
     .make_new    = rm67162_RM67162_make_new,
     .locals_dict = (mp_obj_dict_t *)&rm67162_RM67162_locals_dict,
 };
+#endif
+
+
+STATIC const mp_map_elem_t mp_module_rm67162_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__),   MP_OBJ_NEW_QSTR(MP_QSTR_rm67162)          },
+    { MP_ROM_QSTR(MP_QSTR_RM67162),    (mp_obj_t)&rm67162_RM67162_type       },
+    { MP_ROM_QSTR(MP_QSTR_QSPIPanel),  (mp_obj_t)&rm67162_qspi_bus_type      },
+
+    { MP_ROM_QSTR(MP_QSTR_RGB),        MP_ROM_INT(COLOR_SPACE_RGB)           },
+    { MP_ROM_QSTR(MP_QSTR_BGR),        MP_ROM_INT(COLOR_SPACE_BGR)           },
+    { MP_ROM_QSTR(MP_QSTR_MONOCHROME), MP_ROM_INT(COLOR_SPACE_MONOCHROME)    },
+    { MP_ROM_QSTR(MP_QSTR_BLACK),      MP_ROM_INT(BLACK)                     },
+    { MP_ROM_QSTR(MP_QSTR_BLUE),       MP_ROM_INT(BLUE)                      },
+    { MP_ROM_QSTR(MP_QSTR_RED),        MP_ROM_INT(RED)                       },
+    { MP_ROM_QSTR(MP_QSTR_GREEN),      MP_ROM_INT(GREEN)                     },
+    { MP_ROM_QSTR(MP_QSTR_CYAN),       MP_ROM_INT(CYAN)                      },
+    { MP_ROM_QSTR(MP_QSTR_MAGENTA),    MP_ROM_INT(MAGENTA)                   },
+    { MP_ROM_QSTR(MP_QSTR_YELLOW),     MP_ROM_INT(YELLOW)                    },
+    { MP_ROM_QSTR(MP_QSTR_WHITE),      MP_ROM_INT(WHITE)                     },
+};
+STATIC MP_DEFINE_CONST_DICT(mp_module_rm67162_globals, mp_module_rm67162_globals_table);
+
+
+const mp_obj_module_t mp_module_rm67162 = {
+    .base    = {&mp_type_module},
+    .globals = (mp_obj_dict_t *)&mp_module_rm67162_globals,
+};
+
+
+#if MICROPY_VERSION >= 0x011300 // MicroPython 1.19 or later
+MP_REGISTER_MODULE(MP_QSTR_rm67162, mp_module_rm67162);
+#else
+MP_REGISTER_MODULE(MP_QSTR_rm67162, mp_module_rm67162, MODULE_RM67162_ENABLE);
 #endif

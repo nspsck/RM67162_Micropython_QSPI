@@ -82,6 +82,7 @@ typedef struct _Polygon {
     Point *points;
 } Polygon;
 
+
 typedef struct _rm67162_rotation_t {
     uint8_t madctl;
     uint16_t width;

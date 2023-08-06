@@ -4,7 +4,6 @@ add_library(usermod_rm67162 INTERFACE)
 
 # Add our source files to the lib
 target_sources(usermod_rm67162 INTERFACE
-    ${CMAKE_CURRENT_LIST_DIR}/modlcd.c
     ${CMAKE_CURRENT_LIST_DIR}/rm67162.c
     ${CMAKE_CURRENT_LIST_DIR}/t3amoled_qspi_bus.c
     # ${CMAKE_CURRENT_LIST_DIR}/mpfile.c

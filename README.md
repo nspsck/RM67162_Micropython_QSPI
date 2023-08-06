@@ -15,14 +15,12 @@ It is reconstructed to be more straightforward to develop on, and this allows me
 
 This driver is based on [esp_lcd](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/lcd.html).
 
-Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness,` ect.
+Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness, line, text` ect.
 For full details please visit [the documentation](#documentation).
 
 The firmware is provided each time when I update this repo. 
 
 To-DO:
-- Drawing functions: line
-- Fontsupport: bitmap fonts
 - png support
 
 ## Features
@@ -113,6 +111,10 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 
   Draw a vertical line starting at the postion (x, y) with color and length l.
 
+  - `line(x0, y0, x1, y1, color)`
+
+  Draw a line (not anti-aliazed) from (x0, y0) to (x1, y1) with color.
+
 - `fill(color)`
 
   Fill the entire screen with the color.
@@ -136,6 +138,10 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 - `bitmap(x0, y0, x1, y1, buf)`
 
   Bitmap the content of a bytearray buf filled with color565 values starting from (x0, y0) to (x1, y1). Currently, the user is resposible for the provided buf content.
+
+- `text(font, text, x, y, fg_color, bg_color)`
+
+  Write text using bitmap fonts starting at (x, y) using foreground color `fg_color` and background color `bg_color`.
 
 
 ## Related Repositories
