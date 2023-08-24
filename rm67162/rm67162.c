@@ -52,6 +52,8 @@ Below are transmission related functions.
 STATIC void write_color(rm67162_RM67162_obj_t *self, const void *buf, int len) {
     if (self->lcd_panel_p) {
             self->lcd_panel_p->tx_color(self->bus_obj, 0, buf, len);
+    } else {
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("Failed to find the panel object."));
     }
 }
 
@@ -59,6 +61,8 @@ STATIC void write_color(rm67162_RM67162_obj_t *self, const void *buf, int len) {
 STATIC void write_spi(rm67162_RM67162_obj_t *self, int cmd, const void *buf, int len) {
     if (self->lcd_panel_p) {
             self->lcd_panel_p->tx_param(self->bus_obj, cmd, buf, len);
+    } else {
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("Failed to find the panel object."));
     }
 }
 
@@ -72,6 +76,7 @@ STATIC void frame_buffer_alloc(rm67162_RM67162_obj_t *self, int len) {
     self->frame_buffer_size = len;
     //self->frame_buffer = heap_caps_malloc(self->frame_buffer_size, MALLOC_CAP_DMA);
     self->frame_buffer = gc_alloc(self->frame_buffer_size, 0);
+    //self->frame_buffer = malloc(self->frame_buffer_size);
     
     if (self->frame_buffer == NULL) {
         mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("Failed to allocate DMA'able framebuffer."));
@@ -80,8 +85,7 @@ STATIC void frame_buffer_alloc(rm67162_RM67162_obj_t *self, int len) {
 }
 
 
-STATIC void set_rotation(rm67162_RM67162_obj_t *self, uint8_t rotation)
-{
+STATIC void set_rotation(rm67162_RM67162_obj_t *self, uint8_t rotation) {
     self->madctl_val &= 0x1F;
     self->madctl_val |= self->rotations[rotation].madctl;
 
@@ -120,16 +124,14 @@ mp_obj_t rm67162_RM67162_make_new(const mp_obj_type_t *type,
 {
     enum {
         ARG_bus,
-/*         ARG_buf,
- */        ARG_reset,
+        ARG_reset,
         ARG_reset_level,
         ARG_color_space,
         ARG_bpp
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_bus,            MP_ARG_OBJ | MP_ARG_REQUIRED, {.u_obj = MP_OBJ_NULL}     },
-/*         { MP_QSTR_buf,            MP_ARG_OBJ | MP_ARG_REQUIRED,  {.u_obj = MP_OBJ_NULL}    },
- */        { MP_QSTR_reset,          MP_ARG_OBJ | MP_ARG_KW_ONLY,  {.u_obj = MP_OBJ_NULL}     },
+        { MP_QSTR_reset,          MP_ARG_OBJ | MP_ARG_KW_ONLY,  {.u_obj = MP_OBJ_NULL}     },
         { MP_QSTR_reset_level,    MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}          },
         { MP_QSTR_color_space,    MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = COLOR_SPACE_RGB} },
         { MP_QSTR_bpp,            MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = 16}              },
@@ -166,7 +168,6 @@ mp_obj_t rm67162_RM67162_make_new(const mp_obj_type_t *type,
     self->reset_level = args[ARG_reset_level].u_bool;
     self->color_space = args[ARG_color_space].u_int;
     self->bpp         = args[ARG_bpp].u_int;
-    //mp_get_buffer_raise(args[ARG_buf].u_obj, &self->frame_buffer, MP_BUFFER_RW);
 
     // reset
     if (self->reset != MP_OBJ_NULL) {
@@ -257,9 +258,9 @@ STATIC mp_obj_t rm67162_RM67162_reset(mp_obj_t self_in)
     if (self->reset != MP_OBJ_NULL) {
         mp_hal_pin_obj_t reset_pin = mp_hal_get_pin_obj(self->reset);
         mp_hal_pin_write(reset_pin, self->reset_level);
-        mp_hal_delay_us(300 * 1000);
+        mp_hal_delay_ms(300);    
         mp_hal_pin_write(reset_pin, !self->reset_level);
-        mp_hal_delay_us(200 * 1000);
+        mp_hal_delay_ms(200);    
     } else {
         write_spi(self, LCD_CMD_SWRESET, NULL, 0);
     }
@@ -274,7 +275,7 @@ STATIC mp_obj_t rm67162_RM67162_init(mp_obj_t self_in)
     rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
     write_spi(self, LCD_CMD_SLPOUT, NULL, 0);     //sleep out
-    mp_hal_delay_us(100 * 1000);
+    mp_hal_delay_ms(100);    
 
     write_spi(self, LCD_CMD_MADCTL, (uint8_t[]) {
         self->madctl_val,
@@ -318,8 +319,9 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_send_cmd_obj, 4, 4, r
 Below are drawing functions.
 ------------------------------------------------------------------------------------------------------*/
 
+
 STATIC uint16_t colorRGB(uint8_t r, uint8_t g, uint8_t b) {
-    int c = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3);
+    uint16_t c = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3);
     return _swap_bytes(c);
 }
 
@@ -427,7 +429,6 @@ STATIC void fast_hline(rm67162_RM67162_obj_t *self, int x, int y, uint16_t l, ui
         } 
         set_area(self, x, y, x + l, y);
         fill_color_buffer(self, color, l + 1);
-        
     }
 }
 
@@ -684,20 +685,7 @@ STATIC mp_obj_t rm67162_RM67162_bitmap(size_t n_args, const mp_obj_t *args_in) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(args_in[5], &bufinfo, MP_BUFFER_READ);
     set_area(self, x_start, y_start, x_end, y_end);
-    /* write_spi(self, LCD_CMD_CASET, (uint8_t[]) {
-        ((x_start >> 8) & 0x03),
-        (x_start & 0xFF),
-        (((x_end - 1) >> 8) & 0x03),
-        ((x_end - 1) & 0xFF),
-    }, 4);
-    write_spi(self, LCD_CMD_RASET, (uint8_t[]) {
-        ((y_start >> 8) & 0x03),
-        (y_start & 0xFF),
-        (((y_end - 1) >> 8) & 0x03),
-        ((y_end - 1) & 0xFF),
-    }, 4); */
     size_t len = ((x_end - x_start) * (y_end - y_start) * self->fb_bpp / 8);
-    // self->lcd_panel_p->tx_color(self->bus_obj, LCD_CMD_RAMWR, bufinfo.buf, len);
     write_color(self, bufinfo.buf, len);
 
     return mp_const_none;
