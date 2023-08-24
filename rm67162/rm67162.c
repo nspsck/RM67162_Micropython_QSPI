@@ -524,6 +524,124 @@ STATIC mp_obj_t rm67162_RM67162_fill_rect(size_t n_args, const mp_obj_t *args_in
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_rect_obj, 6, 6, rm67162_RM67162_fill_rect);
 
+STATIC void fill_bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int h, uint16_t color) {
+    int bubble_size;
+    if (w < h) {
+        bubble_size = w / 4;
+    } else {
+        bubble_size = h / 4;
+    }
+    
+    int xm = xs + bubble_size;
+    int ym = ys + bubble_size;
+    int x = 0;
+    int y = bubble_size;
+    int p = 1 - bubble_size;
+    
+    if ((w < (bubble_size * 2)) | (h < (bubble_size * 2))){
+        return;
+    } else {
+        fill_rect(self, xs, ys + bubble_size, w + 1, h - bubble_size * 2, color);
+    }
+
+    while (x <= y) {
+        // top left to right
+        fast_hline(self, xm - x, ym - y, w - bubble_size * 2 + x * 2, color);
+        fast_hline(self, xm - y, ym - x, w - bubble_size * 2 + y * 2, color);
+        
+        // bottom left to right
+        fast_hline(self, xm - x, ym + h - bubble_size * 2 + y, w - bubble_size * 2 + x * 2, color);
+        fast_hline(self, xm - y, ym + h - bubble_size * 2 + x, w - bubble_size * 2 + y * 2, color);
+        
+        if (p < 0) {
+            p += 2 * x + 3;
+        } else {
+            p += 2 * (x - y) + 5;
+            y -= 1;
+        } 
+        x += 1;
+    }
+}
+
+
+STATIC mp_obj_t rm67162_RM67162_fill_bubble_rect(size_t n_args, const mp_obj_t *args_in) {
+    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args_in[0]);
+    int xs = mp_obj_get_int(args_in[1]);
+    int ys = mp_obj_get_int(args_in[2]);
+    int w = mp_obj_get_int(args_in[3]);
+    int h = mp_obj_get_int(args_in[4]);
+    uint16_t color = mp_obj_get_int(args_in[5]);
+
+    fill_bubble_rect(self, xs, ys, w, h, color);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_bubble_rect_obj, 6, 6, rm67162_RM67162_fill_bubble_rect);
+
+STATIC void bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int h, uint16_t color) {
+    int bubble_size;
+    if (w < h) {
+        bubble_size = w / 4;
+    } else {
+        bubble_size = h / 4;
+    }
+    
+    int xm = xs + bubble_size;
+    int ym = ys + bubble_size;
+    int x = 0;
+    int y = bubble_size;
+    int p = 1 - bubble_size;
+    
+    if ((w < (bubble_size * 2)) | (h < (bubble_size * 2))){
+        return;
+    } else {
+        fast_hline(self, xs + bubble_size, ys, w - bubble_size * 2, color);
+        fast_hline(self, xs + bubble_size, ys + h, w - bubble_size * 2, color);
+        fast_vline(self, xs, ys + bubble_size, h - bubble_size * 2, color);
+        fast_vline(self, xs + w, ys + bubble_size, h - bubble_size * 2, color);
+    }
+
+    while (x <= y){
+        // top left
+        draw_pixel(self, xm - x, ym - y, color);
+        draw_pixel(self, xm - y, ym - x, color);
+        
+        // top right
+        draw_pixel(self, xm + w - bubble_size * 2 + x, ym - y, color);
+        draw_pixel(self, xm + w - bubble_size * 2 + y, ym - x, color);
+        
+        // bottom left
+        draw_pixel(self, xm - x, ym + h - bubble_size * 2 + y, color);
+        draw_pixel(self, xm - y, ym + h - bubble_size * 2 + x, color);
+        
+        // bottom right
+        draw_pixel(self, xm + w - bubble_size * 2 + x, ym + h - bubble_size * 2 + y, color);
+        draw_pixel(self, xm + w - bubble_size * 2 + y, ym + h - bubble_size * 2 + x, color);
+        
+        if (p < 0) {
+            p += 2 * x + 3;
+        } else {
+            p += 2 * (x - y) + 5;
+            y -= 1;
+        }
+        x += 1;
+    }
+}
+
+
+STATIC mp_obj_t rm67162_RM67162_bubble_rect(size_t n_args, const mp_obj_t *args_in) {
+    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args_in[0]);
+    int xs = mp_obj_get_int(args_in[1]);
+    int ys = mp_obj_get_int(args_in[2]);
+    int w = mp_obj_get_int(args_in[3]);
+    int h = mp_obj_get_int(args_in[4]);
+    uint16_t color = mp_obj_get_int(args_in[5]);
+
+    bubble_rect(self, xs, ys, w, h, color);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_bubble_rect_obj, 6, 6, rm67162_RM67162_bubble_rect);
+
+
 /*
 Similar to: https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
 */
@@ -1043,40 +1161,42 @@ Mapping to Micropython
 
 STATIC const mp_rom_map_elem_t rm67162_RM67162_locals_dict_table[] = {
     /* { MP_ROM_QSTR(MP_QSTR_custom_init),   MP_ROM_PTR(&rm67162_RM67162_custom_init_obj)   }, */
-    { MP_ROM_QSTR(MP_QSTR_deinit),        MP_ROM_PTR(&rm67162_RM67162_deinit_obj)        },
-    { MP_ROM_QSTR(MP_QSTR_reset),         MP_ROM_PTR(&rm67162_RM67162_reset_obj)         },
-    { MP_ROM_QSTR(MP_QSTR_init),          MP_ROM_PTR(&rm67162_RM67162_init_obj)          },
-    { MP_ROM_QSTR(MP_QSTR_send_cmd),      MP_ROM_PTR(&rm67162_RM67162_send_cmd_obj)      },
-    { MP_ROM_QSTR(MP_QSTR_pixel),         MP_ROM_PTR(&rm67162_RM67162_pixel_obj)         },
-    { MP_ROM_QSTR(MP_QSTR_hline),         MP_ROM_PTR(&rm67162_RM67162_hline_obj)         },
-    { MP_ROM_QSTR(MP_QSTR_vline),         MP_ROM_PTR(&rm67162_RM67162_vline_obj)         },
-    { MP_ROM_QSTR(MP_QSTR_fill),          MP_ROM_PTR(&rm67162_RM67162_fill_obj)          },
-    { MP_ROM_QSTR(MP_QSTR_fill_rect),     MP_ROM_PTR(&rm67162_RM67162_fill_rect_obj)     },
-    { MP_ROM_QSTR(MP_QSTR_fill_circle),   MP_ROM_PTR(&rm67162_RM67162_fill_circle_obj)   },
-    { MP_ROM_QSTR(MP_QSTR_line),          MP_ROM_PTR(&rm67162_RM67162_line_obj)          },
-    { MP_ROM_QSTR(MP_QSTR_rect),          MP_ROM_PTR(&rm67162_RM67162_rect_obj)          },
-    { MP_ROM_QSTR(MP_QSTR_circle),        MP_ROM_PTR(&rm67162_RM67162_circle_obj)        },
-    { MP_ROM_QSTR(MP_QSTR_colorRGB),      MP_ROM_PTR(&rm67162_RM67162_colorRGB_obj)      },
-    { MP_ROM_QSTR(MP_QSTR_bitmap),        MP_ROM_PTR(&rm67162_RM67162_bitmap_obj)        },
-    { MP_ROM_QSTR(MP_QSTR_text),          MP_ROM_PTR(&rm67162_RM67162_text_obj)          },
-    { MP_ROM_QSTR(MP_QSTR_mirror),        MP_ROM_PTR(&rm67162_RM67162_mirror_obj)        },
-    { MP_ROM_QSTR(MP_QSTR_swap_xy),       MP_ROM_PTR(&rm67162_RM67162_swap_xy_obj)       },
-    { MP_ROM_QSTR(MP_QSTR_set_gap),       MP_ROM_PTR(&rm67162_RM67162_set_gap_obj)       },
-    { MP_ROM_QSTR(MP_QSTR_invert_color),  MP_ROM_PTR(&rm67162_RM67162_invert_color_obj)  },
-    { MP_ROM_QSTR(MP_QSTR_disp_off),      MP_ROM_PTR(&rm67162_RM67162_disp_off_obj)      },
-    { MP_ROM_QSTR(MP_QSTR_disp_on),       MP_ROM_PTR(&rm67162_RM67162_disp_on_obj)       },
-    { MP_ROM_QSTR(MP_QSTR_backlight_on),  MP_ROM_PTR(&rm67162_RM67162_backlight_on_obj)  },
-    { MP_ROM_QSTR(MP_QSTR_backlight_off), MP_ROM_PTR(&rm67162_RM67162_backlight_off_obj) },
-    { MP_ROM_QSTR(MP_QSTR_brightness),    MP_ROM_PTR(&rm67162_RM67162_brightness_obj)    },
-    { MP_ROM_QSTR(MP_QSTR_height),        MP_ROM_PTR(&rm67162_RM67162_height_obj)        },
-    { MP_ROM_QSTR(MP_QSTR_width),         MP_ROM_PTR(&rm67162_RM67162_width_obj)         },
-    { MP_ROM_QSTR(MP_QSTR_rotation),      MP_ROM_PTR(&rm67162_RM67162_rotation_obj)      },
-    { MP_ROM_QSTR(MP_QSTR_vscroll_area),  MP_ROM_PTR(&rm67162_RM67162_vscroll_area_obj)  },
-    { MP_ROM_QSTR(MP_QSTR_vscroll_start), MP_ROM_PTR(&rm67162_RM67162_vscroll_start_obj) },
-    { MP_ROM_QSTR(MP_QSTR___del__),       MP_ROM_PTR(&rm67162_RM67162_deinit_obj)        },
-    { MP_ROM_QSTR(MP_QSTR_RGB),           MP_ROM_INT(COLOR_SPACE_RGB)                   },
-    { MP_ROM_QSTR(MP_QSTR_BGR),           MP_ROM_INT(COLOR_SPACE_BGR)                   },
-    { MP_ROM_QSTR(MP_QSTR_MONOCHROME),    MP_ROM_INT(COLOR_SPACE_MONOCHROME)            },
+    { MP_ROM_QSTR(MP_QSTR_deinit),          MP_ROM_PTR(&rm67162_RM67162_deinit_obj)          },
+    { MP_ROM_QSTR(MP_QSTR_reset),           MP_ROM_PTR(&rm67162_RM67162_reset_obj)           },
+    { MP_ROM_QSTR(MP_QSTR_init),            MP_ROM_PTR(&rm67162_RM67162_init_obj)            },
+    { MP_ROM_QSTR(MP_QSTR_send_cmd),        MP_ROM_PTR(&rm67162_RM67162_send_cmd_obj)        },
+    { MP_ROM_QSTR(MP_QSTR_pixel),           MP_ROM_PTR(&rm67162_RM67162_pixel_obj)           },
+    { MP_ROM_QSTR(MP_QSTR_hline),           MP_ROM_PTR(&rm67162_RM67162_hline_obj)           },
+    { MP_ROM_QSTR(MP_QSTR_vline),           MP_ROM_PTR(&rm67162_RM67162_vline_obj)           },
+    { MP_ROM_QSTR(MP_QSTR_fill),            MP_ROM_PTR(&rm67162_RM67162_fill_obj)            },
+    { MP_ROM_QSTR(MP_QSTR_fill_rect),       MP_ROM_PTR(&rm67162_RM67162_fill_rect_obj)       },
+    { MP_ROM_QSTR(MP_QSTR_fill_bubble_rect),MP_ROM_PTR(&rm67162_RM67162_fill_bubble_rect_obj)},
+    { MP_ROM_QSTR(MP_QSTR_fill_circle),     MP_ROM_PTR(&rm67162_RM67162_fill_circle_obj)     },
+    { MP_ROM_QSTR(MP_QSTR_line),            MP_ROM_PTR(&rm67162_RM67162_line_obj)            },
+    { MP_ROM_QSTR(MP_QSTR_rect),            MP_ROM_PTR(&rm67162_RM67162_rect_obj)            },
+    { MP_ROM_QSTR(MP_QSTR_bubble_rect),     MP_ROM_PTR(&rm67162_RM67162_bubble_rect_obj)     },
+    { MP_ROM_QSTR(MP_QSTR_circle),          MP_ROM_PTR(&rm67162_RM67162_circle_obj)          },
+    { MP_ROM_QSTR(MP_QSTR_colorRGB),        MP_ROM_PTR(&rm67162_RM67162_colorRGB_obj)        },
+    { MP_ROM_QSTR(MP_QSTR_bitmap),          MP_ROM_PTR(&rm67162_RM67162_bitmap_obj)          },
+    { MP_ROM_QSTR(MP_QSTR_text),            MP_ROM_PTR(&rm67162_RM67162_text_obj)            },
+    { MP_ROM_QSTR(MP_QSTR_mirror),          MP_ROM_PTR(&rm67162_RM67162_mirror_obj)          },
+    { MP_ROM_QSTR(MP_QSTR_swap_xy),         MP_ROM_PTR(&rm67162_RM67162_swap_xy_obj)         },
+    { MP_ROM_QSTR(MP_QSTR_set_gap),         MP_ROM_PTR(&rm67162_RM67162_set_gap_obj)         },
+    { MP_ROM_QSTR(MP_QSTR_invert_color),    MP_ROM_PTR(&rm67162_RM67162_invert_color_obj)    },
+    { MP_ROM_QSTR(MP_QSTR_disp_off),        MP_ROM_PTR(&rm67162_RM67162_disp_off_obj)        },
+    { MP_ROM_QSTR(MP_QSTR_disp_on),         MP_ROM_PTR(&rm67162_RM67162_disp_on_obj)         },
+    { MP_ROM_QSTR(MP_QSTR_backlight_on),    MP_ROM_PTR(&rm67162_RM67162_backlight_on_obj)    },
+    { MP_ROM_QSTR(MP_QSTR_backlight_off),   MP_ROM_PTR(&rm67162_RM67162_backlight_off_obj)   },
+    { MP_ROM_QSTR(MP_QSTR_brightness),      MP_ROM_PTR(&rm67162_RM67162_brightness_obj)      },
+    { MP_ROM_QSTR(MP_QSTR_height),          MP_ROM_PTR(&rm67162_RM67162_height_obj)          },
+    { MP_ROM_QSTR(MP_QSTR_width),           MP_ROM_PTR(&rm67162_RM67162_width_obj)           },
+    { MP_ROM_QSTR(MP_QSTR_rotation),        MP_ROM_PTR(&rm67162_RM67162_rotation_obj)        },
+    { MP_ROM_QSTR(MP_QSTR_vscroll_area),    MP_ROM_PTR(&rm67162_RM67162_vscroll_area_obj)    },
+    { MP_ROM_QSTR(MP_QSTR_vscroll_start),   MP_ROM_PTR(&rm67162_RM67162_vscroll_start_obj)   },
+    { MP_ROM_QSTR(MP_QSTR___del__),         MP_ROM_PTR(&rm67162_RM67162_deinit_obj)          },
+    { MP_ROM_QSTR(MP_QSTR_RGB),             MP_ROM_INT(COLOR_SPACE_RGB)                      },
+    { MP_ROM_QSTR(MP_QSTR_BGR),             MP_ROM_INT(COLOR_SPACE_BGR)                      },
+    { MP_ROM_QSTR(MP_QSTR_MONOCHROME),      MP_ROM_INT(COLOR_SPACE_MONOCHROME)               },
 };
 STATIC MP_DEFINE_CONST_DICT(rm67162_RM67162_locals_dict, rm67162_RM67162_locals_dict_table);
 
