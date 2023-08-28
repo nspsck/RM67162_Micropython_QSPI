@@ -1,7 +1,14 @@
 RM67162 Driver for MicroPython
 ------------------------------
 # Warning:
-This project is on-halt because of the newest Micropython. The garbage collector seems not to function well on the Lilygo T3 AMOLED. I have test the built firmware on a Generic N16R8 esp32s3 module and it works fine. But on the T3-AMOLED, if I want to rerun the Program, the T3-AOMLED will reset. Currently working on resolving this Issue.... But this might be way out of my knowlege base.
+This project is on-halt because of the newest Micropython. The garbage collector seems not to function well on the Lilygo T3 AMOLED. I have test the built firmware on a Generic N16R8 esp32s3 module and it works fine. But on the T3-AMOLED, if I want to rerun the Program, the T3-AOMLED will reset. Currently working on resolving this Issue.... But this might be way out of my knowlege base. The realted issue is:
+Run
+```python
+from micropython import mem_info
+mem_info()
+b = bytearray(100 * 1024)
+```
+twice, starting from the 2nd time, it takes a very long time for it to complete.
 
 Contents:
 
