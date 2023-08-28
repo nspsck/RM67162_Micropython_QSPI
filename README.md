@@ -1,5 +1,7 @@
 RM67162 Driver for MicroPython
 ------------------------------
+# Warning:
+This project is on-halt because of the newest Micropython. The garbage collector seems not to function well on the Lilygo T3 AMOLED. I have test the built firmware on a Generic N16R8 esp32s3 module and it works fine. But on the T3-AMOLED, if I want to rerun the Program, the T3-AOMLED will reset. Currently working on resolving this Issue.... But this might be way out of my knowlege base.
 
 Contents:
 
@@ -128,6 +130,14 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 - `rect(x, y, w, h, color)`
 
   Draw a rectangle starting from (x, y) with the width w and height h of the color.
+
+  - `fill_bubble_rect(x, y, w, h, color)`
+
+  Draw a rounded text-bubble like rectangle starting from (x, y) with the width w and height h and fill it with the color.
+
+- `bubble_rect(x, y, w, h, color)`
+
+  Draw a rounded text-bubble like rectangle starting from (x, y) with the width w and height h of the color.
 
 - `fill_circle(x, y, r, color)`
 
