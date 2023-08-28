@@ -505,9 +505,9 @@ STATIC mp_obj_t rm67162_RM67162_rect(size_t n_args, const mp_obj_t *args_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_rect_obj, 6, 6, rm67162_RM67162_rect);
 
 
-STATIC void fill_rect(rm67162_RM67162_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t l, uint16_t color) {
-    set_area(self, x, y, x + w - 1, y + l - 1);
-    fill_color_buffer(self, color, w * l);
+STATIC void fill_rect(rm67162_RM67162_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
+    set_area(self, x, y, x + w - 1, y + h - 1);
+    fill_color_buffer(self, color, w * h);
 }
 
 
@@ -525,6 +525,9 @@ STATIC mp_obj_t rm67162_RM67162_fill_rect(size_t n_args, const mp_obj_t *args_in
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_rect_obj, 6, 6, rm67162_RM67162_fill_rect);
 
 STATIC void fill_bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int h, uint16_t color) {
+    if (xs + w >= self->width || ys + h >= self->height) {
+        return;
+    }
     int bubble_size;
     if (w < h) {
         bubble_size = w / 4;
