@@ -9,6 +9,7 @@ mem_info()
 b = bytearray(100 * 1024)
 ```
 twice, starting from the 2nd time, it takes a very long time for it to complete.
+Update: This is most likely caused by Thonny's memory leak. As discussed [here](https://github.com/micropython/micropython/issues/12325). So you can assume that the driver would run just fine...... I hope....
 
 Contents:
 
