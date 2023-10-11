@@ -1,6 +1,4 @@
 import tft_config
-import framebuf
-import time
 
 def hsv2rgb(hue, sat, val):
     '''The conversion algorithm comes from https://blog.csdn.net/lly_3485390095/article/details/104570885'''
@@ -51,36 +49,23 @@ def main():
     tft = tft_config.config()
     tft.reset()
     tft.init()
-    tft.rotation(1)
+    tft.rotation(0)
     x = tft.width()
     y = tft.height()
-    speed = 1
-    delay = speed/1000
-    buf = bytearray(x * speed * 2)
-    fbuf = framebuf.FrameBuffer(buf, x, speed, framebuf.RGB565)
+    speed = 5
     color = hsv_wheel()
-    start_time = time.ticks_ms()
-    count = 0
     while True:
         r, g, b = next(color)
-        fbuf.fill(tft.colorRGB(r, g, b))
+        c = tft.colorRGB(r, g, b)
         for j in range(0, y, speed):
-            tft.bitmap(0, j, x, j + speed, buf)
-            time.sleep(delay)
-            count += 1
+            tft.fill_rect(0, j, x, j + speed, c)
         if y % speed != 0:
-            tft.bitmap(
+            tft.fill_rect(
                 0,
                 y - y % speed,
                 x,
                 y,
-                buf
+                c
             )
-            time.sleep(delay)
-            count += 1
-        if time.ticks_ms() - start_time >= 1000:
-            print("Operations per second: %d" % count)
-            count = 0
-            start_time = time.ticks_ms()
 
 main()
