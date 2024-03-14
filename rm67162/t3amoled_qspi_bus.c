@@ -17,6 +17,11 @@
 
 #include <string.h>
 
+#if MICROPY_VERSION >= MICROPY_MAKE_VERSION(1, 23, 0) // STATIC should be replaced with static.
+#undef STATIC   // This may become irrelevant later on.
+#define STATIC static
+#endif
+
 /*
 Actual functions for qspi transmission.
 */
