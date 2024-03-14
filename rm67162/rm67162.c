@@ -11,6 +11,10 @@
 
 #include <string.h>
 
+#if MICROPY_VERSION >= MICROPY_MAKE_VERSION(1, 23, 0) // STATIC should be replaced with static.
+#undef STATIC   // This may become irrelevant later on.
+#define STATIC static
+#endif
 
 #define _swap_int16_t(a, b) { int16_t t = a; a = b; b = t; }
 #define _swap_bytes(val) ((((val) >> 8) & 0x00FF) | (((val) << 8) & 0xFF00))
