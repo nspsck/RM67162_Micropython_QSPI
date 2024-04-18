@@ -9,7 +9,7 @@ mem_info()
 b = bytearray(100 * 1024)
 ```
 twice, starting from the 2nd time, it takes a very long time for it to complete.
-This is to be believe that you get more RAM for the `esp32`port with the newest Micropython, which can result to too few RAM left for the `freeRTOS` running on the esp32 and hence leads into a system crash.
+This is to be believed that you get more RAM for the `esp32`port with the newest Micropython, which can result in too little RAM left for the `freeRTOS` running on the esp32 and hence leads to a system crash.
 
 Contents:
 
@@ -25,7 +25,7 @@ It is reconstructed to be more straightforward to develop on, and this allows me
 
 This driver is based on [esp_lcd](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/lcd.html).
 
-Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness, line, text` ect.
+Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness, line, text` etc.
 For full details please visit [the documentation](#documentation).
 
 All fonts are created by russhughes.
@@ -53,11 +53,11 @@ Supported boards：
 [4]: https://img.shields.io/badge/-todo-blue
 
 ## Documentation
-In general, the screen starts at 0, and goes to 535 x 239, that's a total resolution of 536 x 240. All drawing functions should be called with this in mind.
+In general, the screen starts at 0 and goes to 535 x 239, that's a total resolution of 536 x 240. All drawing functions should be called with this in mind.
 
 - `rm67162.COLOR`
 
-  This returns a predifined color that can be directly used for drawing. Available options are: BLACK, BLUE, RED, GREEN, CYAN, MAGENTA, YELLOW, WHITE
+  This returns a predefined color that can be directly used for drawing. Available options are: BLACK, BLUE, RED, GREEN, CYAN, MAGENTA, YELLOW, WHITE
 
 - `init()`
 
@@ -89,11 +89,11 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 
 - `backlight_on()`
 
-  Turn on backlight, this is equal to `brightness(100)`.
+  Turn on the backlight, this is equal to `brightness(100)`.
 
 - `backlight_off()`
 
-  Turn off backlight, this is equal to `brightness(0)`.
+  Turn off the backlight, this is equal to `brightness(0)`.
 
 - `invert_color()`
 
@@ -113,19 +113,19 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 
 - `pixel(x, y, color)`
 
-  Draw a single pixel at the postion (x, y) with color.
+  Draw a single pixel at the position (x, y) with color.
 
 - `hline(x, y, l, color)`
 
-  Draw a horizontal line starting at the postion (x, y) with color and length l. 
+  Draw a horizontal line starting at the position (x, y) with color and length l. 
 
 - `vline(x, y, l, color)`
 
-  Draw a vertical line starting at the postion (x, y) with color and length l.
+  Draw a vertical line starting at the position (x, y) with color and length l.
 
   - `line(x0, y0, x1, y1, color)`
 
-  Draw a line (not anti-aliazed) from (x0, y0) to (x1, y1) with color.
+  Draw a line (not anti-aliased) from (x0, y0) to (x1, y1) with color.
 
 - `fill(color)`
 
@@ -141,11 +141,11 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 
   - `fill_bubble_rect(x, y, w, h, color)`
 
-  Draw a rounded text-bubble like rectangle starting from (x, y) with the width w and height h and fill it with the color.
+  Draw a rounded text-bubble-like rectangle starting from (x, y) with the width w and height h and fill it with the color.
 
 - `bubble_rect(x, y, w, h, color)`
 
-  Draw a rounded text-bubble like rectangle starting from (x, y) with the width w and height h of the color.
+  Draw a rounded text-bubble-like rectangle starting from (x, y) with the width w and height h of the color.
 
 - `fill_circle(x, y, r, color)`
 
@@ -157,7 +157,7 @@ In general, the screen starts at 0, and goes to 535 x 239, that's a total resolu
 
 - `bitmap(x0, y0, x1, y1, buf)`
 
-  Bitmap the content of a bytearray buf filled with color565 values starting from (x0, y0) to (x1, y1). Currently, the user is resposible for the provided buf content.
+  Bitmap the content of a bytearray buf filled with color565 values starting from (x0, y0) to (x1, y1). Currently, the user is responsible for the provided buf content.
 
 - `text(font, text, x, y, fg_color, bg_color)`
 
@@ -197,10 +197,10 @@ CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-16MiB.csv"
 ```
-If the esp_lcd related functions are missing, do following:
+If the esp_lcd related functions are missing, do the following:
 ```Shell
 cd micropython/port/esp32
 # use the editor you prefer
 vim esp32_common.cmake
 ```
-Jump to line 105, or where ever `APPEND IDF_COMPONENTS` is located, add `esp_lcd` to the list should fixe this.
+Jump to line 105, or where ever `APPEND IDF_COMPONENTS` is located, add `esp_lcd` to the list should fix this.
