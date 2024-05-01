@@ -5,6 +5,7 @@
 #include "py/runtime.h"
 #include "mphalport.h"
 #include "py/gc.h"
+#include "py/objstr.h"
 
 #include "esp_lcd_panel_io.h"
 #include "driver/spi_master.h"
@@ -913,6 +914,203 @@ STATIC mp_obj_t rm67162_RM67162_text(size_t n_args, const mp_obj_t *args) {
 
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_text_obj, 5, 7, rm67162_RM67162_text);
 
+STATIC uint32_t bs_bit = 0;
+uint8_t *bitmap_data = NULL;
+
+STATIC uint8_t get_color(uint8_t bpp) {
+    uint8_t color = 0;
+    int i;
+
+    for (i = 0; i < bpp; i++) {
+        color <<= 1;
+        color |= (bitmap_data[bs_bit / 8] & 1 << (7 - (bs_bit % 8))) > 0;
+        bs_bit++;
+    }
+    return color;
+}
+
+STATIC mp_obj_t rm67162_RM67162_write_len(size_t n_args, const mp_obj_t *args) {
+    mp_obj_module_t *font = MP_OBJ_TO_PTR(args[1]);
+    mp_obj_dict_t *dict = MP_OBJ_TO_PTR(font->globals);
+    mp_obj_t widths_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTHS));
+    mp_buffer_info_t widths_bufinfo;
+    mp_get_buffer_raise(widths_data_buff, &widths_bufinfo, MP_BUFFER_READ);
+    const uint8_t *widths_data = widths_bufinfo.buf;
+
+    uint16_t print_width = 0;
+
+    mp_obj_t map_obj = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAP));
+    GET_STR_DATA_LEN(map_obj, map_data, map_len);
+    GET_STR_DATA_LEN(args[2], str_data, str_len);
+    const byte *s = str_data, *top = str_data + str_len;
+
+    while (s < top) {
+        unichar ch;
+        ch = utf8_get_char(s);
+        s = utf8_next_char(s);
+
+        const byte *map_s = map_data, *map_top = map_data + map_len;
+        uint16_t char_index = 0;
+
+        while (map_s < map_top) {
+            unichar map_ch;
+            map_ch = utf8_get_char(map_s);
+            map_s = utf8_next_char(map_s);
+
+            if (ch == map_ch) {
+                print_width += widths_data[char_index];
+                break;
+            }
+            char_index++;
+        }
+    }
+
+    return mp_obj_new_int(print_width);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_write_len_obj, 3, 3, rm67162_RM67162_write_len);
+
+//
+//	write(font_module, s, x, y[, fg, bg, background_tuple, fill])
+//		background_tuple (bitmap_buffer, width, height)
+//
+
+STATIC mp_obj_t rm67162_RM67162_write(size_t n_args, const mp_obj_t *args) {
+    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    mp_obj_module_t *font = MP_OBJ_TO_PTR(args[1]);
+
+    mp_int_t x = mp_obj_get_int(args[3]);
+    mp_int_t y = mp_obj_get_int(args[4]);
+    mp_int_t fg_color;
+    mp_int_t bg_color;
+
+    fg_color = (n_args > 5) ? _swap_bytes(mp_obj_get_int(args[5])) : _swap_bytes(WHITE);
+    bg_color = (n_args > 6) ? _swap_bytes(mp_obj_get_int(args[6])) : _swap_bytes(BLACK);
+
+    mp_obj_t *tuple_data = NULL;
+    size_t tuple_len = 0;
+
+    mp_buffer_info_t background_bufinfo;
+    uint16_t background_width = 0;
+    uint16_t background_height = 0;
+    uint16_t *background_data = NULL;
+
+    if (n_args > 7) {
+        mp_obj_tuple_get(args[7], &tuple_len, &tuple_data);
+        if (tuple_len > 2) {
+            mp_get_buffer_raise(tuple_data[0], &background_bufinfo, MP_BUFFER_READ);
+            background_data = background_bufinfo.buf;
+            background_width = mp_obj_get_int(tuple_data[1]);
+            background_height = mp_obj_get_int(tuple_data[2]);
+        }
+    }
+
+    bool fill = (n_args > 8) ? mp_obj_is_true(args[8]) : false;
+
+    mp_obj_dict_t *dict = MP_OBJ_TO_PTR(font->globals);
+    const uint8_t bpp = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BPP)));
+    const uint8_t height = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_HEIGHT)));
+    const uint8_t offset_width = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_OFFSET_WIDTH)));
+    const uint8_t max_width = mp_obj_get_int(mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAX_WIDTH)));
+
+    mp_obj_t widths_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_WIDTHS));
+    mp_buffer_info_t widths_bufinfo;
+    mp_get_buffer_raise(widths_data_buff, &widths_bufinfo, MP_BUFFER_READ);
+    const uint8_t *widths_data = widths_bufinfo.buf;
+
+    mp_obj_t offsets_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_OFFSETS));
+    mp_buffer_info_t offsets_bufinfo;
+    mp_get_buffer_raise(offsets_data_buff, &offsets_bufinfo, MP_BUFFER_READ);
+    const uint8_t *offsets_data = offsets_bufinfo.buf;
+
+    mp_obj_t bitmaps_data_buff = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_BITMAPS));
+    mp_buffer_info_t bitmaps_bufinfo;
+    mp_get_buffer_raise(bitmaps_data_buff, &bitmaps_bufinfo, MP_BUFFER_READ);
+    bitmap_data = bitmaps_bufinfo.buf;
+
+    // if fill is set, and background bitmap data is available copy the background
+    // bitmap data into the buffer. The background buffer must be the size of the
+    // widest character in the font.
+
+    if (fill && background_data && self->frame_buffer) {
+        memcpy(self->frame_buffer, background_data, background_width * background_height * 2);
+    }
+
+    uint16_t print_width = 0;
+    mp_obj_t map_obj = mp_obj_dict_get(dict, MP_OBJ_NEW_QSTR(MP_QSTR_MAP));
+    GET_STR_DATA_LEN(map_obj, map_data, map_len);
+    GET_STR_DATA_LEN(args[2], str_data, str_len);
+    const byte *s = str_data, *top = str_data + str_len;
+    while (s < top) {
+        unichar ch;
+        ch = utf8_get_char(s);
+        s = utf8_next_char(s);
+
+        const byte *map_s = map_data, *map_top = map_data + map_len;
+        uint16_t char_index = 0;
+
+        while (map_s < map_top) {
+            unichar map_ch;
+            map_ch = utf8_get_char(map_s);
+            map_s = utf8_next_char(map_s);
+
+            if (ch == map_ch) {
+                uint8_t width = widths_data[char_index];
+
+                bs_bit = 0;
+                switch (offset_width) {
+                    case 1:
+                        bs_bit = offsets_data[char_index * offset_width];
+                        break;
+
+                    case 2:
+                        bs_bit = (offsets_data[char_index * offset_width] << 8) +
+                            (offsets_data[char_index * offset_width + 1]);
+                        break;
+
+                    case 3:
+                        bs_bit = (offsets_data[char_index * offset_width] << 16) +
+                            (offsets_data[char_index * offset_width + 1] << 8) +
+                            (offsets_data[char_index * offset_width + 2]);
+                        break;
+                }
+
+                uint16_t buffer_width = (fill) ? max_width : width;
+
+                uint16_t color = 0;
+                for (uint16_t yy = 0; yy < height; yy++) {
+                    for (uint16_t xx = 0; xx < width; xx++) {
+                        if (background_data && (xx <= background_width && yy <= background_height)) {
+                            if (get_color(bpp) == bg_color) {
+                                color = background_data[(yy * background_width + xx)];
+                            } else {
+                                color = fg_color;
+                            }
+                        } else {
+                            color = get_color(bpp) ? fg_color : bg_color;
+                        }
+                        self->frame_buffer[yy * buffer_width + xx] = color;
+                    }
+                }
+
+                uint32_t data_size = buffer_width * height * 2;
+                uint16_t x2 = x + buffer_width - 1;
+                uint16_t y2 = y + height - 1;
+                if (x2 < self->width) {
+                    set_area(self, x, y, x2, y2);
+                    write_color(self, (uint8_t *)self->frame_buffer, data_size);
+                    print_width += width;
+                }
+                x += width;
+                break;
+            }
+            char_index++;
+        }
+    }
+
+    return mp_obj_new_int(print_width);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_write_obj, 5, 9, rm67162_RM67162_write);
+
 
 /*---------------------------------------------------------------------------------------------------
 Below are screencontroler related functions
@@ -1173,6 +1371,8 @@ STATIC const mp_rom_map_elem_t rm67162_RM67162_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_init),            MP_ROM_PTR(&rm67162_RM67162_init_obj)            },
     { MP_ROM_QSTR(MP_QSTR_send_cmd),        MP_ROM_PTR(&rm67162_RM67162_send_cmd_obj)        },
     { MP_ROM_QSTR(MP_QSTR_pixel),           MP_ROM_PTR(&rm67162_RM67162_pixel_obj)           },
+    {MP_ROM_QSTR(MP_QSTR_write_len),        MP_ROM_PTR(&rm67162_RM67162_write_len_obj)},
+    {MP_ROM_QSTR(MP_QSTR_write),            MP_ROM_PTR(&rm67162_RM67162_write_obj)},
     { MP_ROM_QSTR(MP_QSTR_hline),           MP_ROM_PTR(&rm67162_RM67162_hline_obj)           },
     { MP_ROM_QSTR(MP_QSTR_vline),           MP_ROM_PTR(&rm67162_RM67162_vline_obj)           },
     { MP_ROM_QSTR(MP_QSTR_fill),            MP_ROM_PTR(&rm67162_RM67162_fill_obj)            },
@@ -1232,7 +1432,6 @@ STATIC const mp_map_elem_t mp_module_rm67162_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__),   MP_OBJ_NEW_QSTR(MP_QSTR_rm67162)          },
     { MP_ROM_QSTR(MP_QSTR_RM67162),    (mp_obj_t)&rm67162_RM67162_type       },
     { MP_ROM_QSTR(MP_QSTR_QSPIPanel),  (mp_obj_t)&rm67162_qspi_bus_type      },
-
     { MP_ROM_QSTR(MP_QSTR_RGB),        MP_ROM_INT(COLOR_SPACE_RGB)           },
     { MP_ROM_QSTR(MP_QSTR_BGR),        MP_ROM_INT(COLOR_SPACE_BGR)           },
     { MP_ROM_QSTR(MP_QSTR_MONOCHROME), MP_ROM_INT(COLOR_SPACE_MONOCHROME)    },

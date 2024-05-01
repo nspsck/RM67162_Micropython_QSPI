@@ -1,22 +1,14 @@
 RM67162 Driver for MicroPython
 ------------------------------
 # Warning:
-This project is on-halt because of the newest Micropython.
-Run
-```python
-from micropython import mem_info
-mem_info()
-b = bytearray(100 * 1024)
-```
-twice, starting from the 2nd time, it takes a very long time for it to complete.
-This is to be believed that you get more RAM for the `esp32`port with the newest Micropython, which can result in too little RAM left for the `freeRTOS` running on the esp32 and hence leads to a system crash.
+This project is not stable on MPY v1.21 and above. The issue lies in the qspi implementations. If you run your program the second time, the device will reset. The issue is currently unknown and I do not have enough time to resolve it in the near future. Sorry.
 
 Contents:
 
 - [RM67162 Driver for MicroPython](#rm67162-driver-for-microPython)
 - [Introduction](#introduction)
 - [Features](#features)
-- [Documentation](#documentation)
+- [Documentation](#documentation) 
 - [How to build](#build)
 
 # Newer versio Lilygo AMOLED S3
@@ -31,14 +23,14 @@ It is reconstructed to be more straightforward to develop on, and this allows me
 
 This driver is based on [esp_lcd](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/lcd.html).
 
-Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness, line, text` etc.
+Available functions: `fill, fill_rect, rect, fill_cirlce, cirlce, pixel, vline, hline, colorRGB, bitmap, brightness, line, text, write, write_len` etc.
 For full details please visit [the documentation](#documentation).
 
 All fonts are created by russhughes.
 
 The firmware is provided each time when I update this repo. 
 
-To-DO:
+To-DO: (This is a lie. :c I hope I can find time to make this happen later in my life..)
 - png support
 
 ## Features
@@ -165,6 +157,15 @@ In general, the screen starts at 0 and goes to 535 x 239, that's a total resolut
 
   Write text using bitmap fonts starting at (x, y) using foreground color `fg_color` and background color `bg_color`.
 
+- `write(bitmap_font, s, x, y[, fg, bg, background_tuple, fill_flag])`
+  Write text to the display using the specified proportional or Monospace bitmap font module with the coordinates as the upper-left corner of the text. The foreground and background colors of the text can be set by the optional arguments `fg` and `bg`, otherwise the foreground color defaults to `WHITE` and the background color defaults to `BLACK`.
+
+  The `font2bitmap` utility creates compatible 1 bit per pixel bitmap modules from Proportional or Monospaced True Type fonts. The character size, foreground, background colors, and characters in the bitmap module may be specified as parameters. Use the -h option for details. If you specify a buffer_size during the display initialization, it must be large enough to hold the widest character (HEIGHT * MAX_WIDTH * 2).
+
+  For more information please visit: [https://github.com/nspsck/st7735s_WeAct_Studio_TFT_port/tree/main](https://github.com/nspsck/st7735s_WeAct_Studio_TFT_port/tree/main)
+
+- `write_len(bitap_font, s)`
+  Returns the string's width in pixels if printed in the specified font.
 
 ## Related Repositories
 
