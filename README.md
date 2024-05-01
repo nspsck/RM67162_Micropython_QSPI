@@ -51,12 +51,8 @@ Supported boards：
 
 | Driver IC | Hardware SPI     | Software SPI     | Hardware QSPI    | I8080            | DPI(RGB)         |
 | --------- | ---------------- | ---------------- | ---------------- | ---------------- | ---------------- |
-| ESP32-S3  | ![alt text][2]   | ![alt text][2]   | ![alt text][1]   | ![alt text][2]   | ![alt text][2]   |
+| ESP32-S3  | [supported](https://github.com/gampam2000/RM67162_Micropyton_SPI)  | [supported](https://github.com/gampam2000/RM67162_Micropyton_SPI)   | supported  | no support   | no support   |
 
-[1]: https://camo.githubusercontent.com/bd5f5f82b920744ff961517942e99a46699fee58737cd9b31bf56e5ca41b781b/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f2d737570706f727465642d677265656e
-[2]: https://img.shields.io/badge/-not%20support-lightgrey
-[3]: https://img.shields.io/badge/-untested-red
-[4]: https://img.shields.io/badge/-todo-blue
 
 ## Documentation
 In general, the screen starts at 0 and goes to 535 x 239, that's a total resolution of 536 x 240. All drawing functions should be called with this in mind.
