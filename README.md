@@ -179,13 +179,13 @@ git clone https://github.com/nspsck/RM67162_Micropython_QSPI.git
 
 # to the micropython directory
 cd micropython/port/esp32
-make BOARD=GENERIC_S3_SPIRAM_OCT USER_C_MODULES=~/RM67162_Micropython_QSPI/micropython.cmake
+make BOARD_VARIANT=SPIRAM_OCT  BOARD=ESP32_GENERIC_S3 USER_C_MODULES=~/RM67162_Micropython_QSPI/micropython.cmake
 ```
 You may also want to modify the `sdkconfig` before building in case to get the 16MB storage.
 ```Shell
 cd micropython/port/esp32
 # use the editor you prefer
-vim boards/GENERIC_S3_SPIRAM_OCT/sdkconfig.board 
+vim boards/ESP32_GENERIC_S3/sdkconfig.board 
 ```
 Change it to:
 ```Shell
