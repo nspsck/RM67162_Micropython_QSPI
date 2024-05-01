@@ -19,6 +19,12 @@ Contents:
 - [Documentation](#documentation)
 - [How to build](#build)
 
+# Newer versio Lilygo AMOLED S3
+According to [Issue#2](https://github.com/nspsck/RM67162_Micropython_QSPI/issues/2), apparently, you have to set `IO38` High for the display to work on newer versions. Huge thanks go to [dobodu](https://github.com/dobodu) to bring this up and [lewisxhe](https://github.com/lewisxhe) for providing the solution. 
+
+# SPI Version
+There is a SPI version of this firmware provided by [gampam2000](https://github.com/gampam2000/RM67162_Micropyton_SPI). Thank you for sharing your work!
+
 ## Introduction
 This is the successor of the previous [lcd_binding_micropython](https://github.com/nspsck/lcd_binding_micropython). 
 It is reconstructed to be more straightforward to develop on, and this allows me to test the changes before committing.
