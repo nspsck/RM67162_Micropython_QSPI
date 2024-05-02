@@ -1,7 +1,5 @@
 RM67162 Driver for MicroPython
 ------------------------------
-# Warning:
-This project is not stable on MPY v1.21 and above. The issue lies in the qspi implementations. If you run your program the second time, the device will reset. The issue is currently unknown and I do not have enough time to resolve it in the near future. Sorry.
 
 Contents:
 
