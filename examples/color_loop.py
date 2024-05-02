@@ -54,18 +54,14 @@ def main():
     y = tft.height()
     speed = 5
     color = hsv_wheel()
+    tft.fill(tft.colorRGB(255, 0, 0))
     while True:
         r, g, b = next(color)
         c = tft.colorRGB(r, g, b)
         for j in range(0, y, speed):
-            tft.fill_rect(0, j, x, j + speed, c)
+            tft.fill_rect(0, j, x, speed, c)
+            print("Current color: ", c)
         if y % speed != 0:
-            tft.fill_rect(
-                0,
-                y - y % speed,
-                x,
-                y,
-                c
-            )
+            tft.fill_rect(0, y - y % speed, x, y % speed, c)
 
 main()

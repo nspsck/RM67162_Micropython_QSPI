@@ -247,10 +247,8 @@ STATIC mp_obj_t rm67162_RM67162_deinit(mp_obj_t self_in)
     }
 
     gc_free(self->frame_buffer);
-    self->frame_buffer = NULL;
-    self->frame_buffer_size = 0;
 
-    // m_del_obj(rm67162_RM67162_obj_t, self); 
+    //m_del_obj(rm67162_RM67162_obj_t, self); 
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(rm67162_RM67162_deinit_obj, rm67162_RM67162_deinit);
@@ -365,6 +363,10 @@ STATIC void set_area(rm67162_RM67162_obj_t *self, uint16_t x0, uint16_t y0, uint
 
 // this function is extremely dangerous and should be called with a lot of care.
 STATIC void fill_color_buffer(rm67162_RM67162_obj_t *self, uint32_t color, int len /*in pixel*/) {
+    if (len > self->frame_buffer_size / 2) {
+        mp_raise_ValueError(MP_ERROR_TEXT("fill_color_buffer: error, maximum length exceeded, please check dimensions."));
+        return;
+    }
     uint32_t *buffer = (uint32_t *)self->frame_buffer;
     color = (color << 16) | color;
     // this ensures that the framebuffer is overfilled rather than unfilled.

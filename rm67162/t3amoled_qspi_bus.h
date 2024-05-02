@@ -7,6 +7,7 @@
 #include "driver/spi_master.h"
 
 
+
 typedef struct _rm67162_panel_p_t {
     void (*tx_param)(mp_obj_base_t *self, int lcd_cmd, const void *param, size_t param_size);
     void (*tx_color)(mp_obj_base_t *self, int lcd_cmd, const void *color, size_t color_size);
@@ -33,7 +34,12 @@ typedef struct _rm67162_qspi_bus_obj_t {
     int cmd_bits;
     int param_bits;
 
-    spi_device_handle_t io_handle;
+    // spi_device_handle_t io_handle;
+    enum {
+        MACHINE_HW_QSPI_STATE_NONE,
+        MACHINE_HW_QSPI_STATE_INIT,
+        MACHINE_HW_QSPI_STATE_DEINIT
+    } state;
 } rm67162_qspi_bus_obj_t;
 
 extern const mp_obj_type_t rm67162_qspi_bus_type;

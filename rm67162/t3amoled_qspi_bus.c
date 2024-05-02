@@ -65,7 +65,7 @@ void hal_lcd_qspi_panel_construct(mp_obj_base_t *self)
         .queue_size = 10,
     };
 
-    ret = spi_bus_add_device(spi_obj->host, &devcfg, &qspi_panel_obj->io_handle);
+    ret = spi_bus_add_device(spi_obj->host, &devcfg, &spi_obj->spi);
     if (ret != 0) {
         mp_raise_msg_varg(&mp_type_OSError, "%d(spi_bus_add_device)", ret);
     }
@@ -80,6 +80,7 @@ STATIC void hal_lcd_qspi_panel_tx_param(mp_obj_base_t *self,
     DEBUG_printf("hal_lcd_qspi_panel_tx_param cmd: %x, param_size: %u\n", lcd_cmd, param_size);
 
     rm67162_qspi_bus_obj_t *qspi_panel_obj = (rm67162_qspi_bus_obj_t *)self;
+    machine_hw_spi_obj_t *spi_obj = ((machine_hw_spi_obj_t *)qspi_panel_obj->spi_obj);
     spi_transaction_t t;
     memset(&t, 0, sizeof(t));
     t.flags = (SPI_TRANS_MULTILINE_CMD | SPI_TRANS_MULTILINE_ADDR);
@@ -93,7 +94,7 @@ STATIC void hal_lcd_qspi_panel_tx_param(mp_obj_base_t *self,
         t.length = 0;
     }
     mp_hal_pin_od_low(qspi_panel_obj->cs_pin);
-    spi_device_polling_transmit(qspi_panel_obj->io_handle, &t);
+    spi_device_polling_transmit(spi_obj->spi, &t);
     mp_hal_pin_od_high(qspi_panel_obj->cs_pin);
 }
 
@@ -106,6 +107,7 @@ STATIC void hal_lcd_qspi_panel_tx_color(mp_obj_base_t *self,
     DEBUG_printf("hal_lcd_qspi_panel_tx_color cmd:, color_size: %u\n", /* lcd_cmd, */ color_size);
 
     rm67162_qspi_bus_obj_t *qspi_panel_obj = (rm67162_qspi_bus_obj_t *)self;
+    machine_hw_spi_obj_t *spi_obj = ((machine_hw_spi_obj_t *)qspi_panel_obj->spi_obj);
     spi_transaction_ext_t t;
 
     mp_hal_pin_od_low(qspi_panel_obj->cs_pin);
@@ -113,7 +115,7 @@ STATIC void hal_lcd_qspi_panel_tx_color(mp_obj_base_t *self,
     t.base.flags = SPI_TRANS_MODE_QIO;
     t.base.cmd = 0x32;
     t.base.addr = 0x002C00;
-    spi_device_polling_transmit(qspi_panel_obj->io_handle, (spi_transaction_t *)&t);
+    spi_device_polling_transmit(spi_obj->spi, (spi_transaction_t *)&t);
 
     uint8_t *p_color = (uint8_t *)color;
     size_t chunk_size;
@@ -135,7 +137,7 @@ STATIC void hal_lcd_qspi_panel_tx_color(mp_obj_base_t *self,
         }
         t.base.tx_buffer = p_color;
         t.base.length = chunk_size * 8;
-        spi_device_polling_transmit(qspi_panel_obj->io_handle, (spi_transaction_t *)&t);
+        spi_device_polling_transmit(spi_obj->spi, (spi_transaction_t *)&t);
         len -= chunk_size;
         p_color += chunk_size;
     } while (len > 0);
@@ -146,8 +148,13 @@ STATIC void hal_lcd_qspi_panel_tx_color(mp_obj_base_t *self,
 
 STATIC void hal_lcd_qspi_panel_deinit(mp_obj_base_t *self)
 {
-   // rm67162_qspi_bus_obj_t *qspi_panel_obj = (rm67162_qspi_bus_obj_t *)self;
-    //esp_lcd_panel_io_del(qspi_panel_obj->io_handle);
+    rm67162_qspi_bus_obj_t *qspi_panel_obj = (rm67162_qspi_bus_obj_t *)self;
+    machine_hw_spi_obj_t *spi_obj = ((machine_hw_spi_obj_t *)qspi_panel_obj->spi_obj);
+    
+    if (spi_obj->state == MACHINE_HW_SPI_STATE_INIT) {
+        spi_obj->state = MACHINE_HW_SPI_STATE_DEINIT;
+        machine_hw_spi_deinit_internal(spi_obj);
+    }
 }
 
 
@@ -210,7 +217,7 @@ STATIC mp_obj_t rm67162_qspi_bus_make_new(const mp_obj_type_t *type,
     // create new object
     rm67162_qspi_bus_obj_t *self = m_new_obj(rm67162_qspi_bus_obj_t);
     self->base.type = &rm67162_qspi_bus_type;
-    self->spi_obj = (mp_obj_base_t *)MP_OBJ_TO_PTR(args[ARG_spi].u_obj);
+    self->spi_obj = MP_OBJ_TO_PTR(args[ARG_spi].u_obj);
 
     // data bus
     mp_obj_tuple_t *t = MP_OBJ_TO_PTR(args[ARG_data].u_obj);
@@ -272,7 +279,7 @@ STATIC mp_obj_t rm67162_qspi_bus_deinit(mp_obj_t self_in)
     mp_obj_base_t *self = (mp_obj_base_t *)MP_OBJ_TO_PTR(self_in);
 
     hal_lcd_qspi_panel_deinit(self);
-    m_del_obj(mp_lcd_spi_panel_obj_t, self);
+    // m_del_obj(mp_lcd_spi_panel_obj_t, self);
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(rm67162_qspi_bus_deinit_obj, rm67162_qspi_bus_deinit);
