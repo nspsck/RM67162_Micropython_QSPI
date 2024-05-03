@@ -98,6 +98,13 @@ typedef struct _rm67162_RM67162_obj_t {
     mp_obj_t reset;
     bool reset_level;
     uint8_t color_space;
+	
+	// m_malloc'd pointers
+    void *work;                 // work buffer for jpg & png decoding
+    uint8_t *scanline_ringbuf;  // png scanline_ringbuf
+    uint8_t *palette;           // png palette
+    uint8_t *trans_palette;     // png trans_palette
+    uint8_t *gamma_table;       // png gamma_table
 
     uint16_t width;
     uint16_t height;
