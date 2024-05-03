@@ -131,7 +131,7 @@ In general, the screen starts at 0 and goes to 535 x 239, that's a total resolut
 
   Draw a rectangle starting from (x, y) with the width w and height h of the color.
 
-  - `fill_bubble_rect(x, y, w, h, color)`
+- `fill_bubble_rect(x, y, w, h, color)`
 
   Draw a rounded text-bubble-like rectangle starting from (x, y) with the width w and height h and fill it with the color.
 
