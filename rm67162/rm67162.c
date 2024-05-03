@@ -1,7 +1,6 @@
 #include "rm67162.h"
 #include "t3amoled_qspi_bus.h"
 
-#include <math.h>
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "mphalport.h"
@@ -432,8 +431,11 @@ STATIC void fast_hline(rm67162_RM67162_obj_t *self, int x, int y, uint16_t l, ui
             l += x;
             x = 0;
         }
+        if (x > self->max_width_value) {
+            x = self->max_width_value; // This is to prevent overflow that could occur at *1
+        }
         if (x + l > self->max_width_value) {
-            l = self->max_width_value - x;
+            l = self->max_width_value - x; // *1
         } 
         set_area(self, x, y, x + l, y);
         fill_color_buffer(self, color, l + 1);
@@ -456,8 +458,11 @@ STATIC void fast_vline(rm67162_RM67162_obj_t *self, int x, int y, uint16_t l, ui
             l += y;
             y = 0;
         }
+        if (y > self->max_width_value) {
+            y = self->max_width_value; // This is to prevent overflow that could occur at *2
+        }
         if (y + l > self->max_height_value) {
-            l = self->max_height_value - y;
+            l = self->max_height_value - y; // *2
         }
         set_area(self, x, y, x, y + l);
         fill_color_buffer(self, color, l + 1);
@@ -492,10 +497,10 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_vline_obj, 5, 5, rm67
 
 
 STATIC void rect(rm67162_RM67162_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t l, uint16_t color) {
-    fast_hline(self, x, y, w, color);
-    fast_hline(self, x, y + l, w, color);
-    fast_vline(self, x, y, l, color);
-    fast_vline(self, x + w, y, l, color);
+    fast_hline(self, x, y, w - 1, color);
+    fast_hline(self, x, y + l - 1, w - 1, color);
+    fast_vline(self, x, y, l - 1, color);
+    fast_vline(self, x + w - 1, y, l - 1, color);
 }
 
 
@@ -533,7 +538,7 @@ STATIC mp_obj_t rm67162_RM67162_fill_rect(size_t n_args, const mp_obj_t *args_in
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_rect_obj, 6, 6, rm67162_RM67162_fill_rect);
 
 STATIC void fill_bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int h, uint16_t color) {
-    if (xs + w >= self->width || ys + h >= self->height) {
+    if (xs + w > self->width || ys + h > self->height) {
         return;
     }
     int bubble_size;
@@ -552,17 +557,17 @@ STATIC void fill_bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w,
     if ((w < (bubble_size * 2)) | (h < (bubble_size * 2))){
         return;
     } else {
-        fill_rect(self, xs, ys + bubble_size, w + 1, h - bubble_size * 2, color);
+        fill_rect(self, xs, ys + bubble_size - 1, w, h - bubble_size * 2, color);
     }
 
     while (x <= y) {
         // top left to right
-        fast_hline(self, xm - x, ym - y, w - bubble_size * 2 + x * 2, color);
-        fast_hline(self, xm - y, ym - x, w - bubble_size * 2 + y * 2, color);
+        fast_hline(self, xm - x, ym - y, w - bubble_size * 2 + x * 2 - 1, color);
+        fast_hline(self, xm - y, ym - x, w - bubble_size * 2 + y * 2 - 1, color);
         
         // bottom left to right
-        fast_hline(self, xm - x, ym + h - bubble_size * 2 + y, w - bubble_size * 2 + x * 2, color);
-        fast_hline(self, xm - y, ym + h - bubble_size * 2 + x, w - bubble_size * 2 + y * 2, color);
+        fast_hline(self, xm - x, ym + h - bubble_size * 2 + y - 1, w - bubble_size * 2 + x * 2 - 1, color);
+        fast_hline(self, xm - y, ym + h - bubble_size * 2 + x - 1, w - bubble_size * 2 + y * 2 - 1, color);
         
         if (p < 0) {
             p += 2 * x + 3;
@@ -589,6 +594,9 @@ STATIC mp_obj_t rm67162_RM67162_fill_bubble_rect(size_t n_args, const mp_obj_t *
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_bubble_rect_obj, 6, 6, rm67162_RM67162_fill_bubble_rect);
 
 STATIC void bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int h, uint16_t color) {
+    if (xs + w > self->width || ys + h > self->height) {
+        return;
+    }
     int bubble_size;
     if (w < h) {
         bubble_size = w / 4;
@@ -605,10 +613,10 @@ STATIC void bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int 
     if ((w < (bubble_size * 2)) | (h < (bubble_size * 2))){
         return;
     } else {
-        fast_hline(self, xs + bubble_size, ys, w - bubble_size * 2, color);
-        fast_hline(self, xs + bubble_size, ys + h, w - bubble_size * 2, color);
-        fast_vline(self, xs, ys + bubble_size, h - bubble_size * 2, color);
-        fast_vline(self, xs + w, ys + bubble_size, h - bubble_size * 2, color);
+        fast_hline(self, xs + bubble_size - 1, ys, w - bubble_size * 2, color);
+        fast_hline(self, xs + bubble_size - 1, ys + h - 1, w - bubble_size * 2, color);
+        fast_vline(self, xs, ys + bubble_size - 1, h - bubble_size * 2, color);
+        fast_vline(self, xs + w -1, ys + bubble_size - 1, h - bubble_size * 2, color);
     }
 
     while (x <= y){
@@ -617,16 +625,16 @@ STATIC void bubble_rect(rm67162_RM67162_obj_t *self, int xs, int ys, int w, int 
         draw_pixel(self, xm - y, ym - x, color);
         
         // top right
-        draw_pixel(self, xm + w - bubble_size * 2 + x, ym - y, color);
-        draw_pixel(self, xm + w - bubble_size * 2 + y, ym - x, color);
+        draw_pixel(self, xm + w - bubble_size * 2 + x - 1, ym - y, color);
+        draw_pixel(self, xm + w - bubble_size * 2 + y - 1, ym - x, color);
         
         // bottom left
-        draw_pixel(self, xm - x, ym + h - bubble_size * 2 + y, color);
-        draw_pixel(self, xm - y, ym + h - bubble_size * 2 + x, color);
+        draw_pixel(self, xm - x, ym + h - bubble_size * 2 + y - 1, color);
+        draw_pixel(self, xm - y, ym + h - bubble_size * 2 + x - 1, color);
         
         // bottom right
-        draw_pixel(self, xm + w - bubble_size * 2 + x, ym + h - bubble_size * 2 + y, color);
-        draw_pixel(self, xm + w - bubble_size * 2 + y, ym + h - bubble_size * 2 + x, color);
+        draw_pixel(self, xm + w - bubble_size * 2 + x - 1, ym + h - bubble_size * 2 + y - 1, color);
+        draw_pixel(self, xm + w - bubble_size * 2 + y - 1, ym + h - bubble_size * 2 + x - 1, color);
         
         if (p < 0) {
             p += 2 * x + 3;
@@ -797,320 +805,6 @@ STATIC mp_obj_t rm67162_RM67162_line(size_t n_args, const mp_obj_t *args_in) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_line_obj, 6, 6, rm67162_RM67162_line);
 
-//
-// TRIAL TO IMPORT ST7789 POLYGON FUNCTIONS
-//
-
-//
-// Return the center of a polygon as an (x, y) tuple
-//
-
-STATIC mp_obj_t rm67162_RM67162_polygon_center(size_t n_args, const mp_obj_t *args) {
-    size_t poly_len;
-    mp_obj_t *polygon;
-    mp_obj_get_array(args[1], &poly_len, &polygon);
-
-    mp_float_t sum = 0.0;
-    int vsx = 0;
-    int vsy = 0;
-
-    if (poly_len > 0) {
-        for (int idx = 0; idx < poly_len; idx++) {
-            size_t point_from_poly_len;
-            mp_obj_t *point_from_poly;
-            mp_obj_get_array(polygon[idx], &point_from_poly_len, &point_from_poly);
-            if (point_from_poly_len < 2) {
-                mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-            }
-
-            mp_int_t v1x = mp_obj_get_int(point_from_poly[0]);
-            mp_int_t v1y = mp_obj_get_int(point_from_poly[1]);
-
-            mp_obj_get_array(polygon[(idx + 1) % poly_len], &point_from_poly_len, &point_from_poly);
-            if (point_from_poly_len < 2) {
-                mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-            }
-
-            mp_int_t v2x = mp_obj_get_int(point_from_poly[0]);
-            mp_int_t v2y = mp_obj_get_int(point_from_poly[1]);
-
-            mp_float_t cross = v1x * v2y - v1y * v2x;
-            sum += cross;
-            vsx += (int)((v1x + v2x) * cross);
-            vsy += (int)((v1y + v2y) * cross);
-        }
-
-        mp_float_t z = 1.0 / (3.0 * sum);
-        vsx = (int)(vsx * z);
-        vsy = (int)(vsy * z);
-    } else {
-        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-    }
-
-    mp_obj_t center[2] = {mp_obj_new_int(vsx), mp_obj_new_int(vsy)};
-    return mp_obj_new_tuple(2, center);
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_polygon_center_obj, 2, 2, rm67162_RM67162_polygon_center);
-
-//
-// RotatePolygon: Rotate a polygon around a center point angle radians
-//
-
-static void RotatePolygon(Polygon *polygon, Point center, mp_float_t angle) {
-    if (polygon->length == 0) {
-        return;         /* reject null polygons */
-
-    }
-    mp_float_t cosAngle = MICROPY_FLOAT_C_FUN(cos)(angle);
-    mp_float_t sinAngle = MICROPY_FLOAT_C_FUN(sin)(angle);
-
-    for (int i = 0; i < polygon->length; i++) {
-        mp_float_t dx = (polygon->points[i].x - center.x);
-        mp_float_t dy = (polygon->points[i].y - center.y);
-
-        polygon->points[i].x = center.x + (int)0.5 + (dx * cosAngle - dy * sinAngle);
-        polygon->points[i].y = center.y + (int)0.5 + (dx * sinAngle + dy * cosAngle);
-    }
-}
-
-//
-// public-domain code by Darel Rex Finley, 2007
-// https://alienryderflex.com/polygon_fill/
-//
-
-#define MAX_POLY_CORNERS 32
-STATIC void PolygonFill(rm67162_RM67162_obj_t *self, Polygon *polygon, Point location, uint16_t color) {
-    int nodes, nodeX[MAX_POLY_CORNERS], pixelY, i, j, swap;
-
-    int minX = INT_MAX;
-    int maxX = INT_MIN;
-    int minY = INT_MAX;
-    int maxY = INT_MIN;
-
-    for (i = 0; i < polygon->length; i++) {
-        if (polygon->points[i].x < minX) {
-            minX = (int)polygon->points[i].x;
-        }
-
-        if (polygon->points[i].x > maxX) {
-            maxX = (int)polygon->points[i].x;
-        }
-
-        if (polygon->points[i].y < minY) {
-            minY = (int)polygon->points[i].y;
-        }
-
-        if (polygon->points[i].y > maxY) {
-            maxY = (int)polygon->points[i].y;
-        }
-    }
-
-    //  Loop through the rows
-    for (pixelY = minY; pixelY < maxY; pixelY++) {
-        //  Build a list of nodes.
-        nodes = 0;
-        j = polygon->length - 1;
-        for (i = 0; i < polygon->length; i++) {
-            if ((polygon->points[i].y < pixelY && polygon->points[j].y >= pixelY) ||
-                (polygon->points[j].y < pixelY && polygon->points[i].y >= pixelY)) {
-                if (nodes < MAX_POLY_CORNERS) {
-                    nodeX[nodes++] = (int)(polygon->points[i].x +
-                        (pixelY - polygon->points[i].y) /
-                        (polygon->points[j].y - polygon->points[i].y) *
-                        (polygon->points[j].x - polygon->points[i].x));
-                } else {
-                    mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon too complex increase MAX_POLY_CORNERS."));
-                }
-            }
-            j = i;
-        }
-
-        //  Sort the nodes, via a simple “Bubble” sort.
-        i = 0;
-        while (i < nodes - 1) {
-            if (nodeX[i] > nodeX[i + 1]) {
-                swap = nodeX[i];
-                nodeX[i] = nodeX[i + 1];
-                nodeX[i + 1] = swap;
-                if (i) {
-                    i--;
-                }
-            } else {
-                i++;
-            }
-        }
-
-        //  Fill the pixels between node pairs.
-        for (i = 0; i < nodes; i += 2) {
-            if (nodeX[i] >= maxX) {
-                break;
-            }
-
-            if (nodeX[i + 1] > minX) {
-                if (nodeX[i] < minX) {
-                    nodeX[i] = minX;
-                }
-
-                if (nodeX[i + 1] > maxX) {
-                    nodeX[i + 1] = maxX;
-                }
-
-                fast_hline(self, (int)location.x + nodeX[i], (int)location.y + pixelY, nodeX[i + 1] - nodeX[i] + 1, color);
-            }
-        }
-    }
-}
-
-STATIC mp_obj_t rm67162_RM67162_polygon(size_t n_args, const mp_obj_t *args) {
-    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-
-    size_t poly_len;
-    mp_obj_t *polygon;
-    mp_obj_get_array(args[1], &poly_len, &polygon);
-
-    self->work = NULL;
-
-    if (poly_len > 0) {
-        mp_int_t x = mp_obj_get_int(args[2]);
-        mp_int_t y = mp_obj_get_int(args[3]);
-        mp_int_t color = mp_obj_get_int(args[4]);
-
-        mp_float_t angle = 0.0f;
-        if (n_args > 5 && mp_obj_is_float(args[5])) {
-            angle = mp_obj_float_get(args[5]);
-        }
-
-        mp_int_t cx = 0;
-        mp_int_t cy = 0;
-
-        if (n_args > 6) {
-            cx = mp_obj_get_int(args[6]);
-            cy = mp_obj_get_int(args[7]);
-        }
-
-        self->work = m_malloc(poly_len * sizeof(Point));
-        if (self->work) {
-            Point *point = (Point *)self->work;
-
-            for (int idx = 0; idx < poly_len; idx++) {
-                size_t point_from_poly_len;
-                mp_obj_t *point_from_poly;
-                mp_obj_get_array(polygon[idx], &point_from_poly_len, &point_from_poly);
-                if (point_from_poly_len < 2) {
-                    mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-                }
-
-                mp_int_t px = mp_obj_get_int(point_from_poly[0]);
-                mp_int_t py = mp_obj_get_int(point_from_poly[1]);
-                point[idx].x = px;
-                point[idx].y = py;
-            }
-
-            Point center;
-            center.x = cx;
-            center.y = cy;
-
-            Polygon polygon;
-            polygon.length = poly_len;
-            polygon.points = self->work;
-
-            if (angle > 0) {
-                RotatePolygon(&polygon, center, angle);
-            }
-
-            for (int idx = 1; idx < poly_len; idx++) {
-                line(
-                    self,
-                    (int)point[idx - 1].x + x,
-                    (int)point[idx - 1].y + y,
-                    (int)point[idx].x + x,
-                    (int)point[idx].y + y, color);
-            }
-
-            m_free(self->work);
-            self->work = NULL;
-        } else {
-            mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-        }
-    } else {
-        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-    }
-
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_polygon_obj, 4, 8, rm67162_RM67162_polygon);
-
-//
-//  filled convex polygon
-//
-
-STATIC mp_obj_t rm67162_RM67162_fill_polygon(size_t n_args, const mp_obj_t *args) {
-    rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-
-    size_t poly_len;
-    mp_obj_t *polygon;
-    mp_obj_get_array(args[1], &poly_len, &polygon);
-
-    self->work = NULL;
-
-    if (poly_len > 0) {
-        mp_int_t x = mp_obj_get_int(args[2]);
-        mp_int_t y = mp_obj_get_int(args[3]);
-        mp_int_t color = mp_obj_get_int(args[4]);
-
-        mp_float_t angle = 0.0f;
-        if (n_args > 5) {
-            angle = mp_obj_float_get(args[5]);
-        }
-
-        mp_int_t cx = 0;
-        mp_int_t cy = 0;
-
-        if (n_args > 6) {
-            cx = mp_obj_get_int(args[6]);
-            cy = mp_obj_get_int(args[7]);
-        }
-
-        self->work = m_malloc(poly_len * sizeof(Point));
-        if (self->work) {
-            Point *point = (Point *)self->work;
-
-            for (int idx = 0; idx < poly_len; idx++) {
-                size_t point_from_poly_len;
-                mp_obj_t *point_from_poly;
-                mp_obj_get_array(polygon[idx], &point_from_poly_len, &point_from_poly);
-                if (point_from_poly_len < 2) {
-                    mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-                }
-
-                point[idx].x = mp_obj_get_int(point_from_poly[0]);
-                point[idx].y = mp_obj_get_int(point_from_poly[1]);
-            }
-
-            Point center = {cx, cy};
-            Polygon polygon = {poly_len, self->work};
-
-            if (angle != 0) {
-                RotatePolygon(&polygon, center, angle);
-            }
-
-            Point location = {x, y};
-            PolygonFill(self, &polygon, location, color);
-
-            m_free(self->work);
-            self->work = NULL;
-        } else {
-            mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-        }
-
-    } else {
-        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Polygon data error"));
-    }
-
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_polygon_obj, 4, 8, rm67162_RM67162_fill_polygon);
-
 
 STATIC mp_obj_t rm67162_RM67162_bitmap(size_t n_args, const mp_obj_t *args_in) {
     rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args_in[0]);
@@ -1228,8 +922,8 @@ STATIC mp_obj_t rm67162_RM67162_text(size_t n_args, const mp_obj_t *args) {
     }
     return mp_const_none;
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_text_obj, 5, 7, rm67162_RM67162_text);
 
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_text_obj, 5, 7, rm67162_RM67162_text);
 
 STATIC uint32_t bs_bit = 0;
 uint8_t *bitmap_data = NULL;
@@ -1688,21 +1382,18 @@ STATIC const mp_rom_map_elem_t rm67162_RM67162_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_init),            MP_ROM_PTR(&rm67162_RM67162_init_obj)            },
     { MP_ROM_QSTR(MP_QSTR_send_cmd),        MP_ROM_PTR(&rm67162_RM67162_send_cmd_obj)        },
     { MP_ROM_QSTR(MP_QSTR_pixel),           MP_ROM_PTR(&rm67162_RM67162_pixel_obj)           },
-    { MP_ROM_QSTR(MP_QSTR_write_len),       MP_ROM_PTR(&rm67162_RM67162_write_len_obj)       },
-    { MP_ROM_QSTR(MP_QSTR_write),           MP_ROM_PTR(&rm67162_RM67162_write_obj)           },
+    {MP_ROM_QSTR(MP_QSTR_write_len),        MP_ROM_PTR(&rm67162_RM67162_write_len_obj)},
+    {MP_ROM_QSTR(MP_QSTR_write),            MP_ROM_PTR(&rm67162_RM67162_write_obj)},
     { MP_ROM_QSTR(MP_QSTR_hline),           MP_ROM_PTR(&rm67162_RM67162_hline_obj)           },
     { MP_ROM_QSTR(MP_QSTR_vline),           MP_ROM_PTR(&rm67162_RM67162_vline_obj)           },
     { MP_ROM_QSTR(MP_QSTR_fill),            MP_ROM_PTR(&rm67162_RM67162_fill_obj)            },
     { MP_ROM_QSTR(MP_QSTR_fill_rect),       MP_ROM_PTR(&rm67162_RM67162_fill_rect_obj)       },
     { MP_ROM_QSTR(MP_QSTR_fill_bubble_rect),MP_ROM_PTR(&rm67162_RM67162_fill_bubble_rect_obj)},
     { MP_ROM_QSTR(MP_QSTR_fill_circle),     MP_ROM_PTR(&rm67162_RM67162_fill_circle_obj)     },
-	{ MP_ROM_QSTR(MP_QSTR_fill_polygon),    MP_ROM_PTR(&rm67162_RM67162_fill_polygon_obj)    },
     { MP_ROM_QSTR(MP_QSTR_line),            MP_ROM_PTR(&rm67162_RM67162_line_obj)            },
     { MP_ROM_QSTR(MP_QSTR_rect),            MP_ROM_PTR(&rm67162_RM67162_rect_obj)            },
     { MP_ROM_QSTR(MP_QSTR_bubble_rect),     MP_ROM_PTR(&rm67162_RM67162_bubble_rect_obj)     },
     { MP_ROM_QSTR(MP_QSTR_circle),          MP_ROM_PTR(&rm67162_RM67162_circle_obj)          },
-	{ MP_ROM_QSTR(MP_QSTR_polygon),         MP_ROM_PTR(&rm67162_RM67162_polygon_obj)         },
-	{ MP_ROM_QSTR(MP_QSTR_polygon_center),  MP_ROM_PTR(&rm67162_RM67162_polygon_center_obj)  },
     { MP_ROM_QSTR(MP_QSTR_colorRGB),        MP_ROM_PTR(&rm67162_RM67162_colorRGB_obj)        },
     { MP_ROM_QSTR(MP_QSTR_bitmap),          MP_ROM_PTR(&rm67162_RM67162_bitmap_obj)          },
     { MP_ROM_QSTR(MP_QSTR_text),            MP_ROM_PTR(&rm67162_RM67162_text_obj)            },
