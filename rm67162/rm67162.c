@@ -994,8 +994,8 @@ STATIC mp_obj_t rm67162_RM67162_write(size_t n_args, const mp_obj_t *args) {
     mp_int_t fg_color;
     mp_int_t bg_color;
 
-    fg_color = (n_args > 5) ? _swap_bytes(mp_obj_get_int(args[5])) : _swap_bytes(WHITE);
-    bg_color = (n_args > 6) ? _swap_bytes(mp_obj_get_int(args[6])) : _swap_bytes(BLACK);
+    fg_color = (n_args > 5) ? mp_obj_get_int(args[5]) : WHITE;
+    bg_color = (n_args > 6) ? mp_obj_get_int(args[6]) : BLACK;
 
     mp_obj_t *tuple_data = NULL;
     size_t tuple_len = 0;
