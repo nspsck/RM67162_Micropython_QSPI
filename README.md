@@ -1,6 +1,9 @@
 RM67162 Driver for MicroPython
 ------------------------------
 
+# Note: 
+Scrolling does not work. Maybe using a framebuffer (provided by Micropython) to scroll will work.
+
 Contents:
 
 - [RM67162 Driver for MicroPython](#rm67162-driver-for-microPython)
