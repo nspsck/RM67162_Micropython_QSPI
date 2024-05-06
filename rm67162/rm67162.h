@@ -119,6 +119,7 @@ typedef struct _rm67162_RM67162_obj_t {
     uint8_t madctl_val; // save current value of LCD_CMD_MADCTL register
     uint8_t colmod_cal; // save surrent value of LCD_CMD_COLMOD register
 
+    bool use_frame_buffer;
     size_t frame_buffer_size;                       // frame buffer size in bytes
     uint16_t *frame_buffer;                         // frame buffer
 } rm67162_RM67162_obj_t;

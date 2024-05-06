@@ -13,7 +13,7 @@
 #include <string.h>
 #include <math.h>
 
-#define RM67162_DRIVER_VERSION "0.0.1"
+#define RM67162_DRIVER_VERSION "0.0.2"
 
 #if MICROPY_VERSION >= MICROPY_MAKE_VERSION(1, 23, 0) // STATIC should be replaced with static.
 #undef STATIC   // This may become irrelevant later on.
@@ -136,14 +136,16 @@ mp_obj_t rm67162_RM67162_make_new(const mp_obj_type_t *type,
         ARG_reset,
         ARG_reset_level,
         ARG_color_space,
-        ARG_bpp
+        ARG_bpp,
+        ARG_use_frame_buffer
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_bus,            MP_ARG_OBJ | MP_ARG_REQUIRED, {.u_obj = MP_OBJ_NULL}     },
-        { MP_QSTR_reset,          MP_ARG_OBJ | MP_ARG_KW_ONLY,  {.u_obj = MP_OBJ_NULL}     },
-        { MP_QSTR_reset_level,    MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}          },
-        { MP_QSTR_color_space,    MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = COLOR_SPACE_RGB} },
-        { MP_QSTR_bpp,            MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = 16}              },
+        { MP_QSTR_bus,               MP_ARG_OBJ | MP_ARG_REQUIRED, {.u_obj = MP_OBJ_NULL}     },
+        { MP_QSTR_reset,             MP_ARG_OBJ | MP_ARG_KW_ONLY,  {.u_obj = MP_OBJ_NULL}     },
+        { MP_QSTR_reset_level,       MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}          },
+        { MP_QSTR_color_space,       MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = COLOR_SPACE_RGB} },
+        { MP_QSTR_bpp,               MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = 16}              },
+        { MP_QSTR_use_frame_buffer,  MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_bool = false}          },
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(
@@ -170,9 +172,13 @@ mp_obj_t rm67162_RM67162_make_new(const mp_obj_type_t *type,
     self->width = ((rm67162_qspi_bus_obj_t *)self->bus_obj)->width;
     self->height = ((rm67162_qspi_bus_obj_t *)self->bus_obj)->height;
 
-    // 2 bytes for each pixel. so maximum will be width * height * 2
-    frame_buffer_alloc(self, self->width * self->height * 2);
+    self->use_frame_buffer = args[ARG_use_frame_buffer].u_bool;
 
+    if (self->use_frame_buffer) {
+        // 2 bytes for each pixel. so maximum will be width * height * 2
+        frame_buffer_alloc(self, self->width * self->height * 2);
+    }
+    
     self->reset       = args[ARG_reset].u_obj;
     self->reset_level = args[ARG_reset_level].u_bool;
     self->color_space = args[ARG_color_space].u_int;
@@ -358,22 +364,21 @@ STATIC void set_area(rm67162_RM67162_obj_t *self, uint16_t x0, uint16_t y0, uint
     }
 
     uint8_t bufx[4] = {
-        ((x0 >> 8) & 0x03),
+        ((x0 >> 8) & 0xFF),
         (x0 & 0xFF),
-        ((x1 >> 8) & 0x03),
+        ((x1 >> 8) & 0xFF),
         (x1 & 0xFF)};
     uint8_t bufy[4] = {
-        ((y0 >> 8) & 0x03),
+        ((y0 >> 8) & 0xFF),
         (y0 & 0xFF),
-        ((y1 >> 8) & 0x03),
+        ((y1 >> 8) & 0xFF),
         (y1 & 0xFF)};
     write_spi(self, LCD_CMD_CASET, bufx, 4);
     write_spi(self, LCD_CMD_RASET, bufy, 4);
-    write_spi(self, LCD_CMD_RAMWR, NULL, 0);
 }
 
 // this function is extremely dangerous and should be called with a lot of care.
-STATIC void fill_color_buffer(rm67162_RM67162_obj_t *self, uint32_t color, int len /*in pixel*/) {
+STATIC void fill_color_buffer_fast(rm67162_RM67162_obj_t *self, uint32_t color, int len /*in pixel*/) {
     if (len > self->frame_buffer_size / 2) {
         mp_raise_ValueError(MP_ERROR_TEXT("fill_color_buffer: error, maximum length exceeded, please check dimensions."));
         return;
@@ -388,6 +393,40 @@ STATIC void fill_color_buffer(rm67162_RM67162_obj_t *self, uint32_t color, int l
         *buffer++ = color;
     }
     write_color(self, self->frame_buffer, len * 2);
+}
+
+// Slower but does not require a frame buffer.
+STATIC void fill_color_buffer_slow(rm67162_RM67162_obj_t *self, uint16_t color, int len /*in pixel*/) {
+    // The buffer size must be big enough for it to function. Reason not so known,
+    // potentially the cs pin can not be switched on and off that quick.
+    const int buffer_pixel_size = 536 * 8;
+    int chunks = len / buffer_pixel_size;
+    int rest = len % buffer_pixel_size;
+    uint16_t buffer[buffer_pixel_size];
+
+    for (int i = 0; i < len && i < buffer_pixel_size; i++) {
+        buffer[i] = color;
+    }
+    if (chunks) {
+        for (int j = 0; j < chunks; j++) {
+            write_color(self, (uint8_t *)buffer, buffer_pixel_size * 2);
+        }
+    }
+    if (rest) {
+        write_color(self, (uint8_t *)buffer, rest * 2);
+    }
+}
+
+
+STATIC void fill_color_buffer(rm67162_RM67162_obj_t *self, uint16_t color, int len /*in pixel*/) {
+    if (self->use_frame_buffer && self->frame_buffer == NULL) {
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("No framebuffer available."));
+    }
+    if (self->use_frame_buffer && self->frame_buffer) {
+        fill_color_buffer_fast(self, color, len);
+    } else {
+        fill_color_buffer_slow(self, color, len);
+    }
 }
 
 
@@ -1204,6 +1243,11 @@ STATIC mp_obj_t rm67162_RM67162_text(size_t n_args, const mp_obj_t *args) {
     uint8_t wide = width / 8;
     size_t buf_size = width * height * 2;
 
+    if (self->use_frame_buffer) {
+    } else {
+        self->frame_buffer = m_malloc(buf_size);
+    }
+
     uint8_t chr;
     if (self->frame_buffer) {
     while (source_len--) {
@@ -1234,6 +1278,12 @@ STATIC mp_obj_t rm67162_RM67162_text(size_t n_args, const mp_obj_t *args) {
             }
         }
     }
+
+    if (self->use_frame_buffer) {
+    } else {
+        m_free(self->frame_buffer);
+    }
+
     return mp_const_none;
 }
 
@@ -1352,10 +1402,17 @@ STATIC mp_obj_t rm67162_RM67162_write(size_t n_args, const mp_obj_t *args) {
     mp_get_buffer_raise(bitmaps_data_buff, &bitmaps_bufinfo, MP_BUFFER_READ);
     bitmap_data = bitmaps_bufinfo.buf;
 
+    // allocate buffer large enough the the widest character in the font
+    // if a buffer was not specified during the driver init.
+    size_t buf_size = max_width * height * 2;
+    if (self->use_frame_buffer) {
+    } else {
+        self->frame_buffer = m_malloc(buf_size);
+    }
+
     // if fill is set, and background bitmap data is available copy the background
     // bitmap data into the buffer. The background buffer must be the size of the
     // widest character in the font.
-
     if (fill && background_data && self->frame_buffer) {
         memcpy(self->frame_buffer, background_data, background_width * background_height * 2);
     }
@@ -1430,6 +1487,11 @@ STATIC mp_obj_t rm67162_RM67162_write(size_t n_args, const mp_obj_t *args) {
             }
             char_index++;
         }
+    }
+
+    if (self->use_frame_buffer) {
+    } else {
+        m_free(self->frame_buffer);
     }
 
     return mp_obj_new_int(print_width);
