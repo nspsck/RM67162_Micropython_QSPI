@@ -13,6 +13,8 @@
 #include <string.h>
 #include <math.h>
 
+#define RM67162_DRIVER_VERSION "0.0.1"
+
 #if MICROPY_VERSION >= MICROPY_MAKE_VERSION(1, 23, 0) // STATIC should be replaced with static.
 #undef STATIC   // This may become irrelevant later on.
 #define STATIC static
@@ -114,11 +116,12 @@ STATIC void rm67162_RM67162_print(const mp_print_t *print,
     rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(self_in);
     mp_printf(
         print,
-        "<RM67162 bus=%p, reset=%p, color_space=%s, bpp=%u>",
+        "<RM67162 bus=%p, reset=%p, color_space=%s, bpp=%u>, version=%s",
         self->bus_obj,
         self->reset,
         color_space_desc[self->color_space],
-        self->bpp
+        self->bpp,
+        RM67162_DRIVER_VERSION
     );
 }
 
@@ -237,6 +240,13 @@ mp_obj_t rm67162_RM67162_make_new(const mp_obj_type_t *type,
 
     return MP_OBJ_FROM_PTR(self);
 }
+
+
+STATIC mp_obj_t rm67162_RM67162_version()
+{   
+    return mp_obj_new_str(RM67162_DRIVER_VERSION, 5);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_0(rm67162_RM67162_version_obj, rm67162_RM67162_version);
 
 
 STATIC mp_obj_t rm67162_RM67162_deinit(mp_obj_t self_in)
@@ -1677,6 +1687,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_vscroll_start_obj, 2,
 // Mapping to Micropython
 STATIC const mp_rom_map_elem_t rm67162_RM67162_locals_dict_table[] = {
     /* { MP_ROM_QSTR(MP_QSTR_custom_init),   MP_ROM_PTR(&rm67162_RM67162_custom_init_obj)   }, */
+    { MP_ROM_QSTR(MP_QSTR_version),         MP_ROM_PTR(&rm67162_RM67162_version_obj)          },
     { MP_ROM_QSTR(MP_QSTR_deinit),          MP_ROM_PTR(&rm67162_RM67162_deinit_obj)          },
     { MP_ROM_QSTR(MP_QSTR_reset),           MP_ROM_PTR(&rm67162_RM67162_reset_obj)           },
     { MP_ROM_QSTR(MP_QSTR_init),            MP_ROM_PTR(&rm67162_RM67162_init_obj)            },
