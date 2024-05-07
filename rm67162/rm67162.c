@@ -26,6 +26,8 @@
 #define ABS(N) (((N) < 0) ? (-(N)) : (N))
 #define mp_hal_delay_ms(delay) (mp_hal_delay_us(delay * 1000))
 
+#define MAX_BUFFER_SIZE_IN_PIXEL  4288 // 536 * 8 = 4288
+
 const char* color_space_desc[] = {
     "RGB",
     "BGR",
@@ -380,7 +382,7 @@ STATIC void set_area(rm67162_RM67162_obj_t *self, uint16_t x0, uint16_t y0, uint
 // this function is extremely dangerous and should be called with a lot of care.
 STATIC void fill_color_buffer_fast(rm67162_RM67162_obj_t *self, uint32_t color, int len /*in pixel*/) {
     if (len > self->frame_buffer_size / 2) {
-        mp_raise_ValueError(MP_ERROR_TEXT("fill_color_buffer: error, maximum length exceeded, please check dimensions."));
+        mp_raise_ValueError(MP_ERROR_TEXT("fill_color_buffer: maximum length exceeded, please check dimensions."));
         return;
     }
     uint32_t *buffer = (uint32_t *)self->frame_buffer;
@@ -396,36 +398,59 @@ STATIC void fill_color_buffer_fast(rm67162_RM67162_obj_t *self, uint32_t color, 
 }
 
 // Slower but does not require a frame buffer.
-STATIC void fill_color_buffer_slow(rm67162_RM67162_obj_t *self, uint16_t color, int len /*in pixel*/) {
-    // The buffer size must be big enough for it to function. Reason not so known,
-    // potentially the cs pin can not be switched on and off that quick.
-    const int buffer_pixel_size = 536 * 8;
-    int chunks = len / buffer_pixel_size;
-    int rest = len % buffer_pixel_size;
-    uint16_t buffer[buffer_pixel_size];
-
-    for (int i = 0; i < len && i < buffer_pixel_size; i++) {
-        buffer[i] = color;
-    }
-    if (chunks) {
-        for (int j = 0; j < chunks; j++) {
-            write_color(self, (uint8_t *)buffer, buffer_pixel_size * 2);
+STATIC void fill_color_buffer_slow(rm67162_RM67162_obj_t *self, uint16_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+    size_t area_pixel_size = w * h;
+    
+    if (area_pixel_size <= MAX_BUFFER_SIZE_IN_PIXEL) {
+        self->frame_buffer = m_malloc(MAX_BUFFER_SIZE_IN_PIXEL * 2);
+        for (int i = 0; i < MAX_BUFFER_SIZE_IN_PIXEL; i++) {
+            self->frame_buffer[i] = color;
         }
-    }
-    if (rest) {
-        write_color(self, (uint8_t *)buffer, rest * 2);
-    }
+        // Everything is in the buffer, so just write it to the area.
+        set_area(self, x, y, x + w - 1, y + h - 1);
+        write_color(self, (uint8_t *)self->frame_buffer, MAX_BUFFER_SIZE_IN_PIXEL * 2);
+    } else { // In this case, maybe MAX_BUFFER_SIZE_IN_PIXEL divides the area width, but most likely not.
+        // So we fix the width, and define chunk_height being: chunk_height * width <= MAX_BUFFER_SIZE_IN_PIXEL
+        // and (chunk_height + 1) * width > MAX_BUFFER_SIZE_IN_PIXEL. 
+        // Our new buffer_pixel_size = chunk_height * width.
+        // And the chunks will be area_pixel_size / buffer_pixel_size.
+        // And the rest will be area_pixel_size % buffer_pixel_size. And since w divides both 
+        // area_pixel_size and buffer_pixel_size, the rest_height will be rest / w.
+        uint16_t chunk_height = MAX_BUFFER_SIZE_IN_PIXEL / w;
+        size_t buffer_pixel_size = chunk_height * w;
+        int chunks = area_pixel_size / buffer_pixel_size;
+        int rest = area_pixel_size % buffer_pixel_size;
+
+        self->frame_buffer = m_malloc(buffer_pixel_size * 2);
+        for (int i = 0; i < buffer_pixel_size; i++) {
+            self->frame_buffer[i] = color;
+        }
+
+        for (int j = 0; j < chunks; j++) {
+            set_area(self, x, y + (chunk_height * j), x + w - 1, y + (chunk_height * (j + 1)) - 1);
+            write_color(self, (uint8_t *)self->frame_buffer, buffer_pixel_size * 2);
+        }
+
+        if (rest) {
+            uint16_t rest_height = rest / w;
+            set_area(self, x, y + h - rest_height, x + w - 1, y + h - 1);
+            write_color(self, (uint8_t *)self->frame_buffer, rest * 2);
+        }
+    }        
+    
+    m_free(self->frame_buffer);
 }
 
 
-STATIC void fill_color_buffer(rm67162_RM67162_obj_t *self, uint16_t color, int len /*in pixel*/) {
+STATIC void fill_color_buffer(rm67162_RM67162_obj_t *self, uint16_t color, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
     if (self->use_frame_buffer && self->frame_buffer == NULL) {
         mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("No framebuffer available."));
     }
     if (self->use_frame_buffer && self->frame_buffer) {
-        fill_color_buffer_fast(self, color, len);
+        set_area(self, x, y, x + w - 1, y + h - 1);
+        fill_color_buffer_fast(self, color, w * h);
     } else {
-        fill_color_buffer_slow(self, color, len);
+        fill_color_buffer_slow(self, color, x, y, w, h);
     }
 }
 
@@ -449,18 +474,12 @@ STATIC mp_obj_t rm67162_RM67162_pixel(size_t n_args, const mp_obj_t *args_in) {
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_pixel_obj, 4, 4, rm67162_RM67162_pixel);
 
 
-// this can be replaced by fill_rect
-STATIC void fast_fill(rm67162_RM67162_obj_t *self, uint16_t color) {
-    set_area(self, 0, 0, self->max_width_value, self->max_height_value);
-    fill_color_buffer(self, color, self->frame_buffer_size / 2);
-}
-
-
 STATIC mp_obj_t rm67162_RM67162_fill(size_t n_args, const mp_obj_t *args_in) {
     rm67162_RM67162_obj_t *self = MP_OBJ_TO_PTR(args_in[0]);
     uint16_t color = mp_obj_get_int(args_in[1]);
 
-    fast_fill(self, color);
+    fill_color_buffer(self, color, 0, 0, self->width, self->height);
+    
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_fill_obj, 2, 2, rm67162_RM67162_fill);
@@ -487,8 +506,7 @@ STATIC void fast_hline(rm67162_RM67162_obj_t *self, int x, int y, uint16_t l, ui
         if (x + l > self->max_width_value) {
             l = self->max_width_value - x; // *1
         } 
-        set_area(self, x, y, x + l, y);
-        fill_color_buffer(self, color, l + 1);
+        fill_color_buffer(self, color, x, y, l, 1);
     }
 }
 
@@ -514,8 +532,7 @@ STATIC void fast_vline(rm67162_RM67162_obj_t *self, int x, int y, uint16_t l, ui
         if (y + l > self->max_height_value) {
             l = self->max_height_value - y; // *2
         }
-        set_area(self, x, y, x, y + l);
-        fill_color_buffer(self, color, l + 1);
+        fill_color_buffer(self, color, x, y, 1, l + 1);
     }
 }
 
@@ -569,8 +586,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(rm67162_RM67162_rect_obj, 6, 6, rm671
 
 
 STATIC void fill_rect(rm67162_RM67162_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color) {
-    set_area(self, x, y, x + w - 1, y + h - 1);
-    fill_color_buffer(self, color, w * h);
+    // set_area(self, x, y, x + w - 1, y + h - 1);
+    fill_color_buffer(self, color, x, y, w, h);
 }
 
 
