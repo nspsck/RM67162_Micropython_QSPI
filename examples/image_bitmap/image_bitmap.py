@@ -1,17 +1,12 @@
 import tft_config
 import logo
-import gc
-import time
 
 def main():
     tft = tft_config.config()
     tft.reset()
     tft.init()
     tft.rotation(1)
-    tft.bitmap(0, 0, logo.WIDTH, logo.HEIGHT, logo.BITMAP)
-    time.sleep(0.1)
-    del tft
+    # From 0 to logo.WIDTH - 1 are logo.WIDTH pixels in total.
+    tft.bitmap(0, 0, logo.WIDTH - 1, logo.HEIGHT - 1, logo.BITMAP)
 
-gc.enable()
 main()
-gc.collect()
