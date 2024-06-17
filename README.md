@@ -11,6 +11,7 @@ Contents:
 - [Features](#features)
 - [Documentation](#documentation) 
 - [How to build](#build)
+- [Optional Scripts](#optional-scripts)
 
 # Newer versio Lilygo AMOLED S3
 According to [Issue#2](https://github.com/nspsck/RM67162_Micropython_QSPI/issues/2), apparently, you have to set `IO38` High for the display to work on newer versions. Huge thanks go to [dobodu](https://github.com/dobodu) to bring this up and [lewisxhe](https://github.com/lewisxhe) for providing the solution. 
@@ -208,3 +209,24 @@ cd micropython/port/esp32
 vim esp32_common.cmake
 ```
 Jump to line 105, or where ever `APPEND IDF_COMPONENTS` is located, add `esp_lcd` to the list should fix this.
+
+## Optional Scripts
+
+- `img_to_bytearray.py`
+
+  Convert an image to a Python bytearray bitmap that can be used with the `bitmap` function. Resizes images to fit on the 536x240 display of the RM67162 without changing the aspect ratio. Be sure to install [Pillow](https://pillow.readthedocs.io/en/stable/) before running this script.
+  
+  positional arguments:
+  - `image_path`            Path to the input image.
+  - `output_file`           (optional) Path to the output .py file. Defaults to the same path as input image with .py extension.
+
+  options:
+  -  `-h, --help`            show this help message and exit
+  - `-w WIDTH, --width WIDTH`
+                        Target width for the image. Default is 536.
+  - `-ht HEIGHT, --height HEIGHT`
+                        Target height for the image. Default is 240.
+  - `-d [CONVERTED_IMAGE_PATH], -debug [CONVERTED_IMAGE_PATH]`
+                        Path to save the resized image for debugging purposes. If no path is provided, the converted image will be saved as {input}_conv.png.
+
+
