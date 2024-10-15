@@ -146,7 +146,7 @@ mp_obj_t rm67162_RM67162_make_new(const mp_obj_type_t *type,
         { MP_QSTR_reset,             MP_ARG_OBJ | MP_ARG_KW_ONLY,  {.u_obj = MP_OBJ_NULL}     },
         { MP_QSTR_reset_level,       MP_ARG_BOOL | MP_ARG_KW_ONLY, {.u_bool = false}          },
         { MP_QSTR_color_space,       MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = COLOR_SPACE_RGB} },
-        { MP_QSTR_bpp,               MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = 16}              },
+        { MP_QSTR_BPP,               MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_int = 16}              },
         { MP_QSTR_use_frame_buffer,  MP_ARG_INT | MP_ARG_KW_ONLY,  {.u_bool = false}          },
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];

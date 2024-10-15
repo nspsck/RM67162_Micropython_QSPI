@@ -12,7 +12,7 @@ def config():
         width=240,
         height=536
     )
-    return rm67162.RM67162(panel, reset=Pin(17), bpp=16)
+    return rm67162.RM67162(panel, reset=Pin(17), BPP=16)
 
 
 def color565(r, g, b):
